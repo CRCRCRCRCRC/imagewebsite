@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Space</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero-card">
+        <p class="eyebrow">Image Space</p>
+        <div class="hero-copy">
+          <div>
+            <h1>圖片上傳站</h1>
+            <p>
+              進來就可以直接上傳圖片，或者先新增資料夾再分類整理。畫面上的圖片會保存在你的瀏覽器裡。
+            </p>
+          </div>
+          <div class="hero-stats" aria-label="摘要資訊">
+            <article>
+              <span id="folderCount">0</span>
+              <p>資料夾</p>
+            </article>
+            <article>
+              <span id="imageCount">0</span>
+              <p>圖片</p>
+            </article>
+          </div>
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="action-card" aria-labelledby="actionsTitle">
+          <div class="section-heading">
+            <p class="eyebrow">Quick Actions</p>
+            <h2 id="actionsTitle">先選動作</h2>
+          </div>
+
+          <div class="action-grid">
+            <button class="action-button primary" id="uploadTrigger" type="button">
+              <span class="action-icon" aria-hidden="true">↑</span>
+              <span class="action-text">
+                <strong>上傳圖片</strong>
+                <small>一次可選多張圖片</small>
+              </span>
+            </button>
+
+            <button class="action-button secondary" id="openFolderModal" type="button">
+              <span class="action-icon" aria-hidden="true">+</span>
+              <span class="action-text">
+                <strong>新增資料夾</strong>
+                <small>建立分類後再上傳</small>
+              </span>
+            </button>
+          </div>
+
+          <input id="fileInput" type="file" accept="image/*" multiple hidden />
+
+          <div class="status-row">
+            <p class="status-message" id="statusMessage" role="status" aria-live="polite">
+              選一個資料夾後就可以開始上傳。
+            </p>
+            <p class="status-current">
+              目前資料夾：
+              <strong id="currentFolderName">讀取中...</strong>
+            </p>
+          </div>
+        </section>
+
+        <section class="folders-card" aria-labelledby="foldersTitle">
+          <div class="section-heading">
+            <p class="eyebrow">Folders</p>
+            <h2 id="foldersTitle">資料夾列表</h2>
+          </div>
+          <div class="folder-list" id="folderList" role="list"></div>
+        </section>
+
+        <section class="gallery-card" aria-labelledby="galleryTitle">
+          <div class="section-heading section-heading-inline">
+            <div>
+              <p class="eyebrow">Gallery</p>
+              <h2 id="galleryTitle">圖片預覽</h2>
+            </div>
+            <p class="gallery-count" id="galleryCount">0 張</p>
+          </div>
+
+          <div class="gallery-grid" id="galleryGrid"></div>
+          <div class="empty-state" id="emptyState">
+            <strong>這個資料夾還沒有圖片</strong>
+            <p>按上面的「上傳圖片」把第一張放進來。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="folderModal" aria-hidden="true">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
+        <div class="section-heading">
+          <p class="eyebrow">Create Folder</p>
+          <h2 id="folderModalTitle">新增資料夾</h2>
+        </div>
+
+        <form id="folderForm" class="folder-form">
+          <label class="field-label" for="folderNameInput">資料夾名稱</label>
+          <input
+            id="folderNameInput"
+            name="folderName"
+            type="text"
+            maxlength="40"
+            placeholder="例如：旅遊、商品圖、靈感收藏"
+            required
+          />
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" id="closeFolderModal">取消</button>
+            <button type="submit" class="solid-button">建立資料夾</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
