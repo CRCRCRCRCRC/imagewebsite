@@ -1,8 +1,7 @@
-const DB_NAME = "image-space-db";
-const DB_VERSION = 1;
-const FOLDER_STORE = "folders";
-const IMAGE_STORE = "images";
-const DEFAULT_FOLDER_ID = "folder-default";
+const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
+const ROOT_FOLDER_NAME = "我的圖片";
+const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
+const HOME_LABEL = "首頁";
 const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 
 const elements = {
@@ -13,7 +12,9 @@ const elements = {
   folderModal: document.querySelector("#folderModal"),
   folderForm: document.querySelector("#folderForm"),
   folderNameInput: document.querySelector("#folderNameInput"),
+  submitFolderForm: document.querySelector("#submitFolderForm"),
   folderList: document.querySelector("#folderList"),
+  galleryStage: document.querySelector("#galleryStage"),
   galleryGrid: document.querySelector("#galleryGrid"),
   emptyState: document.querySelector("#emptyState"),
   statusMessage: document.querySelector("#statusMessage"),
@@ -24,74 +25,68 @@ const elements = {
 };
 
 const state = {
-  db: null,
   folders: [],
   images: [],
-  selectedFolderId: DEFAULT_FOLDER_ID,
-  previewUrls: [],
+  selectedFolderId: null,
+  isBusy: false,
 };
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
-
-  if (!("indexedDB" in window)) {
-    setStatus("你的瀏覽器不支援 IndexedDB，無法儲存圖片。", true);
-    return;
-  }
+  setBusy(true);
 
   try {
-    state.db = await openDatabase();
-    await ensureDefaultFolder();
-    await loadState();
-    render();
+    await refreshLibrary();
     setStatus("準備完成，可以開始上傳圖片。");
   } catch (error) {
     console.error(error);
-    setStatus("初始化失敗，請重新整理後再試一次。", true);
+    setStatus("初始化失敗，請確認 Vercel Blob 設定。", true);
+  } finally {
+    setBusy(false);
   }
 }
 
 function bindEvents() {
-  elements.uploadTrigger.addEventListener("click", () => {
-    elements.fileInput.click();
+  elements.uploadTrigger?.addEventListener("click", () => {
+    elements.fileInput?.click();
   });
 
-  elements.fileInput.addEventListener("change", handleUpload);
-  elements.openFolderModal.addEventListener("click", openFolderModal);
-  elements.closeFolderModal.addEventListener("click", closeFolderModal);
-  elements.folderModal.addEventListener("click", (event) => {
+  elements.fileInput?.addEventListener("change", handleUpload);
+  elements.openFolderModal?.addEventListener("click", openFolderModal);
+  elements.closeFolderModal?.addEventListener("click", closeFolderModal);
+  elements.folderForm?.addEventListener("submit", handleCreateFolder);
+
+  elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
       closeFolderModal();
     }
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && elements.folderModal.classList.contains("open")) {
+    if (event.key === "Escape" && elements.folderModal?.classList.contains("open")) {
       closeFolderModal();
     }
   });
-
-  elements.folderForm.addEventListener("submit", handleCreateFolder);
 }
 
 function openFolderModal() {
-  elements.folderModal.classList.add("open");
-  elements.folderModal.setAttribute("aria-hidden", "false");
-  requestAnimationFrame(() => elements.folderNameInput.focus());
+  elements.folderModal?.classList.add("open");
+  elements.folderModal?.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => elements.folderNameInput?.focus());
 }
 
 function closeFolderModal() {
-  elements.folderModal.classList.remove("open");
-  elements.folderModal.setAttribute("aria-hidden", "true");
-  elements.folderForm.reset();
+  elements.folderModal?.classList.remove("open");
+  elements.folderModal?.setAttribute("aria-hidden", "true");
+  elements.folderForm?.reset();
 }
 
 async function handleCreateFolder(event) {
   event.preventDefault();
 
-  const rawName = elements.folderNameInput.value.trim();
+  const rawName = elements.folderNameInput?.value.trim() || "";
   if (!rawName) {
     setStatus("資料夾名稱不能是空的。", true);
     return;
@@ -102,119 +97,127 @@ async function handleCreateFolder(event) {
   );
 
   if (duplicated) {
-    setStatus("已經有同名資料夾了，換一個名稱。", true);
+    setStatus("已經有同名資料夾了。", true);
     return;
   }
 
-  const folder = {
-    id: `folder-${Date.now()}`,
-    name: rawName,
-    createdAt: new Date().toISOString(),
-  };
+  try {
+    setBusy(true);
 
-  await putRecord(FOLDER_STORE, folder);
-  state.selectedFolderId = folder.id;
-  saveSelectedFolder();
+    const response = await fetch("/api/folders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: rawName }),
+    });
 
-  await loadState();
-  render();
-  closeFolderModal();
-  setStatus(`資料夾「${rawName}」已建立。`);
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "建立資料夾失敗。");
+    }
+
+    state.selectedFolderId = payload.folder.id;
+    saveSelectedFolder();
+    await refreshLibrary(payload.folder.id);
+    closeFolderModal();
+    setStatus(`資料夾 ${rawName} 已建立。`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "建立資料夾失敗。", true);
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function handleUpload(event) {
   const files = Array.from(event.target.files ?? []);
-  elements.fileInput.value = "";
+  if (elements.fileInput) {
+    elements.fileInput.value = "";
+  }
 
   if (files.length === 0) {
     return;
   }
 
-  const nonImages = files.filter((file) => !file.type.startsWith("image/"));
-  if (nonImages.length > 0) {
+  if (files.some((file) => !file.type.startsWith("image/"))) {
     setStatus("只能上傳圖片檔案。", true);
     return;
   }
 
-  const targetFolder = getSelectedFolder();
+  const oversized = files.find((file) => file.size > MAX_FILE_SIZE);
+  if (oversized) {
+    setStatus(`圖片 ${oversized.name} 超過 4.5 MB。`, true);
+    return;
+  }
+
+  const targetFolder = getActiveFolder();
   if (!targetFolder) {
     setStatus("請先選擇資料夾。", true);
     return;
   }
 
   try {
-    await Promise.all(
-      files.map((file) =>
-        putRecord(IMAGE_STORE, {
-          id: `image-${crypto.randomUUID()}`,
-          folderId: targetFolder.id,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          uploadedAt: new Date().toISOString(),
-          blob: file,
-        }),
-      ),
-    );
+    setBusy(true);
 
-    await loadState();
-    render();
-    setStatus(`上傳成功，已加入 ${files.length} 張圖片到「${targetFolder.name}」。`);
+    let completed = 0;
+    for (const file of files) {
+      completed += 1;
+      setStatus(`上傳中 ${completed}/${files.length}`);
+      await uploadSingleFile(file, targetFolder.id);
+    }
+
+    await refreshLibrary(targetFolder.id);
+    setStatus(`已上傳 ${files.length} 張圖片。`);
   } catch (error) {
     console.error(error);
-    setStatus("上傳失敗，請再試一次。", true);
+    setStatus(error.message || "上傳失敗。", true);
+  } finally {
+    setBusy(false);
   }
 }
 
-async function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.addEventListener("upgradeneeded", () => {
-      const db = request.result;
-
-      if (!db.objectStoreNames.contains(FOLDER_STORE)) {
-        db.createObjectStore(FOLDER_STORE, { keyPath: "id" });
-      }
-
-      if (!db.objectStoreNames.contains(IMAGE_STORE)) {
-        const imageStore = db.createObjectStore(IMAGE_STORE, { keyPath: "id" });
-        imageStore.createIndex("folderId", "folderId", { unique: false });
-      }
-    });
-
-    request.addEventListener("success", () => resolve(request.result));
-    request.addEventListener("error", () => reject(request.error));
+async function refreshLibrary(preferredFolderId = state.selectedFolderId) {
+  const response = await fetch("/api/library", {
+    cache: "no-store",
   });
-}
 
-async function ensureDefaultFolder() {
-  const defaultFolder = await getRecord(FOLDER_STORE, DEFAULT_FOLDER_ID);
-
-  if (defaultFolder) {
-    return;
+  const payload = await parseJson(response);
+  if (!response.ok) {
+    throw new Error(payload.error || "讀取資料失敗。");
   }
 
-  await putRecord(FOLDER_STORE, {
-    id: DEFAULT_FOLDER_ID,
-    name: "我的圖片",
-    createdAt: new Date().toISOString(),
-  });
-}
-
-async function loadState() {
-  const [folders, images] = await Promise.all([getAllRecords(FOLDER_STORE), getAllRecords(IMAGE_STORE)]);
-
-  state.folders = folders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  state.images = images.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  state.folders = payload.folders || [];
+  state.images = payload.images || [];
 
   const savedFolderId = localStorage.getItem(SELECTED_FOLDER_KEY);
-  const hasSavedFolder = state.folders.some((folder) => folder.id === savedFolderId);
+  const nextFolderId = preferredFolderId || savedFolderId || ROOT_FOLDER_ID;
 
-  if (hasSavedFolder) {
-    state.selectedFolderId = savedFolderId;
-  } else if (!state.folders.some((folder) => folder.id === state.selectedFolderId)) {
-    state.selectedFolderId = state.folders[0]?.id ?? DEFAULT_FOLDER_ID;
+  if (state.folders.some((folder) => folder.id === nextFolderId)) {
+    state.selectedFolderId = nextFolderId;
+  } else if (state.folders.some((folder) => folder.id === ROOT_FOLDER_ID)) {
+    state.selectedFolderId = ROOT_FOLDER_ID;
+  } else {
+    state.selectedFolderId = state.folders[0]?.id ?? null;
+  }
+
+  saveSelectedFolder();
+  render();
+}
+
+async function uploadSingleFile(file, folderId) {
+  const formData = new FormData();
+  formData.set("folderId", folderId);
+  formData.set("file", file);
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  const payload = await parseJson(response);
+  if (!response.ok) {
+    throw new Error(payload.error || "上傳失敗。");
   }
 }
 
@@ -225,133 +228,168 @@ function render() {
 }
 
 function renderFolderList() {
-  elements.folderList.innerHTML = "";
+  if (!elements.folderList) {
+    return;
+  }
 
-  state.folders.forEach((folder) => {
-    const count = state.images.filter((image) => image.folderId === folder.id).length;
+  const rootFolder = state.folders.find((folder) => folder.id === ROOT_FOLDER_ID) ?? null;
+  const customFolders = state.folders.filter((folder) => folder.id !== ROOT_FOLDER_ID);
+  const rootHasImages = state.images.some((image) => image.folderId === ROOT_FOLDER_ID);
+  const visibleFolders = [];
+
+  if (rootFolder && (customFolders.length > 0 || rootHasImages)) {
+    visibleFolders.push(rootFolder);
+  }
+
+  visibleFolders.push(...customFolders);
+
+  elements.folderList.innerHTML = "";
+  elements.folderList.hidden = visibleFolders.length === 0;
+
+  visibleFolders.forEach((folder) => {
+    const displayName = getFolderDisplayName(folder);
     const button = document.createElement("button");
     button.type = "button";
     button.className = `folder-pill${folder.id === state.selectedFolderId ? " active" : ""}`;
-    button.innerHTML = `
-      <div>
-        <strong>${escapeHtml(folder.name)}</strong>
-        <span>${formatDate(folder.createdAt)}</span>
-      </div>
-      <span class="folder-badge">${count}</span>
-    `;
+    button.setAttribute("aria-label", displayName);
+
+    const art = document.createElement("span");
+    art.className = "folder-art";
+    art.setAttribute("aria-hidden", "true");
+    art.innerHTML = getFolderIconMarkup();
+    button.append(art);
+
+    const label = document.createElement("strong");
+    label.textContent = displayName;
+    button.append(label);
+
     button.addEventListener("click", () => {
       state.selectedFolderId = folder.id;
       saveSelectedFolder();
       render();
-      setStatus(`目前正在查看「${folder.name}」。`);
+      setStatus(displayName);
     });
 
-    elements.folderList.append(button);
+    elements.folderList?.append(button);
   });
 }
 
 function renderGallery() {
-  cleanupPreviewUrls();
-  elements.galleryGrid.innerHTML = "";
+  if (!elements.galleryGrid || !elements.galleryStage) {
+    return;
+  }
 
-  const folder = getSelectedFolder();
   const images = state.images.filter((image) => image.folderId === state.selectedFolderId);
-
-  elements.currentFolderName.textContent = folder?.name ?? "未選擇";
-  elements.galleryCount.textContent = `${images.length} 張`;
-  elements.emptyState.hidden = images.length > 0;
+  elements.galleryGrid.innerHTML = "";
+  elements.galleryStage.hidden = images.length === 0;
 
   images.forEach((image) => {
-    const imageUrl = URL.createObjectURL(image.blob);
-    state.previewUrls.push(imageUrl);
-
     const article = document.createElement("article");
     article.className = "gallery-item";
-    article.innerHTML = `
-      <img src="${imageUrl}" alt="${escapeHtml(image.name)}" />
-      <div class="image-meta">
-        <strong>${escapeHtml(image.name)}</strong>
-        <p>${formatSize(image.size)} · ${formatDate(image.uploadedAt)}</p>
-      </div>
-    `;
 
-    elements.galleryGrid.append(article);
+    const img = document.createElement("img");
+    img.src = image.url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+
+    article.append(img);
+    elements.galleryGrid?.append(article);
   });
+
+  if (elements.emptyState) {
+    elements.emptyState.hidden = true;
+  }
+
+  updateText(elements.currentFolderName, getSelectedFolder()?.name || "");
+  updateText(elements.galleryCount, String(images.length));
 }
 
 function renderStats() {
-  elements.folderCount.textContent = String(state.folders.length);
-  elements.imageCount.textContent = String(state.images.length);
+  updateText(elements.folderCount, String(state.folders.length));
+  updateText(elements.imageCount, String(state.images.length));
 }
 
-function cleanupPreviewUrls() {
-  state.previewUrls.forEach((url) => URL.revokeObjectURL(url));
-  state.previewUrls = [];
+function getActiveFolder() {
+  return getSelectedFolder() || getRootFolder();
 }
 
 function getSelectedFolder() {
   return state.folders.find((folder) => folder.id === state.selectedFolderId) ?? null;
 }
 
+function getRootFolder() {
+  return state.folders.find((folder) => folder.id === ROOT_FOLDER_ID) ?? null;
+}
+
+function getFolderDisplayName(folder) {
+  return folder.id === ROOT_FOLDER_ID ? HOME_LABEL : folder.name;
+}
+
 function saveSelectedFolder() {
+  if (!state.selectedFolderId) {
+    localStorage.removeItem(SELECTED_FOLDER_KEY);
+    return;
+  }
+
   localStorage.setItem(SELECTED_FOLDER_KEY, state.selectedFolderId);
 }
 
 function setStatus(message, isError = false) {
-  elements.statusMessage.textContent = message;
-  elements.statusMessage.style.color = isError ? "var(--accent-deep)" : "var(--secondary)";
+  updateText(elements.statusMessage, message);
+  document.body.dataset.state = isError ? "error" : "ready";
 }
 
-function getRecord(storeName, key) {
-  return new Promise((resolve, reject) => {
-    const transaction = state.db.transaction(storeName, "readonly");
-    const request = transaction.objectStore(storeName).get(key);
-    request.addEventListener("success", () => resolve(request.result));
-    request.addEventListener("error", () => reject(request.error));
-  });
+function updateText(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
 }
 
-function getAllRecords(storeName) {
-  return new Promise((resolve, reject) => {
-    const transaction = state.db.transaction(storeName, "readonly");
-    const request = transaction.objectStore(storeName).getAll();
-    request.addEventListener("success", () => resolve(request.result));
-    request.addEventListener("error", () => reject(request.error));
-  });
-}
+async function parseJson(response) {
+  const text = await response.text();
 
-function putRecord(storeName, value) {
-  return new Promise((resolve, reject) => {
-    const transaction = state.db.transaction(storeName, "readwrite");
-    const request = transaction.objectStore(storeName).put(value);
-    request.addEventListener("success", () => resolve(request.result));
-    request.addEventListener("error", () => reject(request.error));
-  });
-}
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024 * 1024) {
-    return `${Math.round(bytes / 1024)} KB`;
+  if (!text) {
+    return {};
   }
 
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(error);
+    return {};
+  }
 }
 
-function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function setBusy(isBusy) {
+  state.isBusy = isBusy;
+
+  if (elements.uploadTrigger) {
+    elements.uploadTrigger.disabled = isBusy;
+  }
+
+  if (elements.openFolderModal) {
+    elements.openFolderModal.disabled = isBusy;
+  }
+
+  if (elements.closeFolderModal) {
+    elements.closeFolderModal.disabled = isBusy;
+  }
+
+  if (elements.folderNameInput) {
+    elements.folderNameInput.disabled = isBusy;
+  }
+
+  if (elements.submitFolderForm) {
+    elements.submitFolderForm.disabled = isBusy;
+  }
 }
 
-window.addEventListener("beforeunload", cleanupPreviewUrls);
+function getFolderIconMarkup() {
+  return `
+    <svg viewBox="0 0 120 120" class="line-icon">
+      <path d="M16 42c0-6 5-11 11-11h22l9 10h35c6 0 11 5 11 11v33c0 8-6 14-14 14H30c-8 0-14-6-14-14V42z" />
+      <path d="M16 49h88" />
+    </svg>
+  `;
+}
