@@ -1,7 +1,6 @@
 const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
 const ROOT_FOLDER_NAME = "我的圖片";
 const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
-const HOME_LABEL = "首頁";
 const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 
 const elements = {
@@ -50,11 +49,21 @@ async function init() {
 
 function bindEvents() {
   elements.uploadTrigger?.addEventListener("click", () => {
+    if (state.isBusy) {
+      return;
+    }
+
     elements.fileInput?.click();
   });
 
   elements.fileInput?.addEventListener("change", handleUpload);
-  elements.openFolderModal?.addEventListener("click", openFolderModal);
+  elements.openFolderModal?.addEventListener("click", () => {
+    if (state.isBusy) {
+      return;
+    }
+
+    openFolderModal();
+  });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
 
@@ -131,6 +140,10 @@ async function handleCreateFolder(event) {
 }
 
 async function handleUpload(event) {
+  if (state.isBusy) {
+    return;
+  }
+
   const files = Array.from(event.target.files ?? []);
   if (elements.fileInput) {
     elements.fileInput.value = "";
@@ -151,7 +164,7 @@ async function handleUpload(event) {
     return;
   }
 
-  const targetFolder = getActiveFolder();
+  const targetFolder = getUploadFolder();
   if (!targetFolder) {
     setStatus("請先選擇資料夾。", true);
     return;
@@ -167,7 +180,7 @@ async function handleUpload(event) {
       await uploadSingleFile(file, targetFolder.id);
     }
 
-    await refreshLibrary(targetFolder.id);
+    await refreshLibrary(state.selectedFolderId);
     setStatus(`已上傳 ${files.length} 張圖片。`);
   } catch (error) {
     console.error(error);
@@ -191,14 +204,12 @@ async function refreshLibrary(preferredFolderId = state.selectedFolderId) {
   state.images = payload.images || [];
 
   const savedFolderId = localStorage.getItem(SELECTED_FOLDER_KEY);
-  const nextFolderId = preferredFolderId || savedFolderId || ROOT_FOLDER_ID;
+  const nextFolderId = preferredFolderId ?? savedFolderId;
 
-  if (state.folders.some((folder) => folder.id === nextFolderId)) {
+  if (nextFolderId && state.folders.some((folder) => folder.id === nextFolderId && folder.id !== ROOT_FOLDER_ID)) {
     state.selectedFolderId = nextFolderId;
-  } else if (state.folders.some((folder) => folder.id === ROOT_FOLDER_ID)) {
-    state.selectedFolderId = ROOT_FOLDER_ID;
   } else {
-    state.selectedFolderId = state.folders[0]?.id ?? null;
+    state.selectedFolderId = null;
   }
 
   saveSelectedFolder();
@@ -232,26 +243,16 @@ function renderFolderList() {
     return;
   }
 
-  const rootFolder = state.folders.find((folder) => folder.id === ROOT_FOLDER_ID) ?? null;
   const customFolders = state.folders.filter((folder) => folder.id !== ROOT_FOLDER_ID);
-  const rootHasImages = state.images.some((image) => image.folderId === ROOT_FOLDER_ID);
-  const visibleFolders = [];
-
-  if (rootFolder && (customFolders.length > 0 || rootHasImages)) {
-    visibleFolders.push(rootFolder);
-  }
-
-  visibleFolders.push(...customFolders);
 
   elements.folderList.innerHTML = "";
-  elements.folderList.hidden = visibleFolders.length === 0;
+  elements.folderList.hidden = customFolders.length === 0;
 
-  visibleFolders.forEach((folder) => {
-    const displayName = getFolderDisplayName(folder);
+  customFolders.forEach((folder) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `folder-pill${folder.id === state.selectedFolderId ? " active" : ""}`;
-    button.setAttribute("aria-label", displayName);
+    button.setAttribute("aria-label", folder.name);
 
     const art = document.createElement("span");
     art.className = "folder-art";
@@ -260,14 +261,18 @@ function renderFolderList() {
     button.append(art);
 
     const label = document.createElement("strong");
-    label.textContent = displayName;
+    label.textContent = folder.name;
     button.append(label);
 
     button.addEventListener("click", () => {
-      state.selectedFolderId = folder.id;
+      if (state.isBusy) {
+        return;
+      }
+
+      state.selectedFolderId = state.selectedFolderId === folder.id ? null : folder.id;
       saveSelectedFolder();
       render();
-      setStatus(displayName);
+      setStatus(state.selectedFolderId ? folder.name : "首頁");
     });
 
     elements.folderList?.append(button);
@@ -279,7 +284,8 @@ function renderGallery() {
     return;
   }
 
-  const images = state.images.filter((image) => image.folderId === state.selectedFolderId);
+  const viewedFolderId = getViewedFolderId();
+  const images = state.images.filter((image) => image.folderId === viewedFolderId);
   elements.galleryGrid.innerHTML = "";
   elements.galleryStage.hidden = images.length === 0;
 
@@ -301,7 +307,7 @@ function renderGallery() {
     elements.emptyState.hidden = true;
   }
 
-  updateText(elements.currentFolderName, getSelectedFolder()?.name || "");
+  updateText(elements.currentFolderName, state.selectedFolderId ? getSelectedFolder()?.name || "" : "首頁");
   updateText(elements.galleryCount, String(images.length));
 }
 
@@ -310,7 +316,11 @@ function renderStats() {
   updateText(elements.imageCount, String(state.images.length));
 }
 
-function getActiveFolder() {
+function getViewedFolderId() {
+  return state.selectedFolderId || ROOT_FOLDER_ID;
+}
+
+function getUploadFolder() {
   return getSelectedFolder() || getRootFolder();
 }
 
@@ -322,12 +332,8 @@ function getRootFolder() {
   return state.folders.find((folder) => folder.id === ROOT_FOLDER_ID) ?? null;
 }
 
-function getFolderDisplayName(folder) {
-  return folder.id === ROOT_FOLDER_ID ? HOME_LABEL : folder.name;
-}
-
 function saveSelectedFolder() {
-  if (!state.selectedFolderId) {
+  if (!state.selectedFolderId || state.selectedFolderId === ROOT_FOLDER_ID) {
     localStorage.removeItem(SELECTED_FOLDER_KEY);
     return;
   }
@@ -365,11 +371,15 @@ function setBusy(isBusy) {
   state.isBusy = isBusy;
 
   if (elements.uploadTrigger) {
-    elements.uploadTrigger.disabled = isBusy;
+    elements.uploadTrigger.setAttribute("aria-disabled", String(isBusy));
   }
 
   if (elements.openFolderModal) {
-    elements.openFolderModal.disabled = isBusy;
+    elements.openFolderModal.setAttribute("aria-disabled", String(isBusy));
+  }
+
+  if (elements.fileInput) {
+    elements.fileInput.disabled = isBusy;
   }
 
   if (elements.closeFolderModal) {
