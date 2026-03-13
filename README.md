@@ -1,22 +1,33 @@
 # Image Space
 
-可部署到 GitHub 與 Vercel 的圖片上傳站。
+This project is ready to push to GitHub and deploy on Vercel.
 
-## 本機開發
+## Structure
+
+- `index.html`, `styles.css`, `app.js`: static frontend
+- `api/*.js`: Vercel Functions
+- `lib/blob.js`: Vercel Blob folder and image logic
+- `vercel.json`: Vercel project config
+
+## Local Development
 
 1. `npm install`
-2. 第一次使用 Vercel CLI 時先執行 `vercel login`
-3. 建立 Vercel Blob，並把 `BLOB_READ_WRITE_TOKEN` 放進 `.env.local`
-4. `npm run dev:vercel`
+2. `vercel login`
+3. Create a Blob Store in your Vercel project
+4. Pull project settings and env vars with `vercel pull`
+5. Run `npm run dev:vercel`
 
-## 部署到 Vercel
+## Deploy To Vercel
 
-1. 把這個資料夾推到 GitHub
-2. 在 Vercel 匯入這個 repo
-3. 在 Vercel 專案裡建立並綁定一個 Public Blob Store
-4. 重新部署
+1. Push this folder to GitHub
+2. In Vercel, click `Add New Project`
+3. Select this GitHub repo
+4. Keep the root directory as this project root
+5. In the Vercel project `Storage` tab, create and connect a Public Blob Store
+6. Redeploy
 
-## 備註
+## Notes
 
-- 目前這版走 Vercel Function 轉存到 Blob，前端限制單張圖片 4.5 MB 內
-- 如果你之後要支援更大的圖片，可以再改成 Vercel Blob client uploads
+- Uploads are handled by Vercel Functions and stored in Vercel Blob
+- Current upload limit is 4.5 MB per image
+- If the Blob Store is connected to the same Vercel project, `BLOB_READ_WRITE_TOKEN` is provided automatically in deployment
