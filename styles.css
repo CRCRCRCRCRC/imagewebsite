@@ -40,15 +40,26 @@ body::selection {
   padding: 28px 34px 40px;
 }
 
-.workspace-row {
+.workspace-stack {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 196px;
-  gap: 24px;
-  align-items: start;
+  gap: 20px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.workspace-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 18px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .gallery-stage {
-  min-height: calc(100vh - 80px);
+  flex: 0 1 auto;
+  min-height: 0;
+  max-width: min(100%, calc(100vw - 430px));
 }
 
 .gallery-stage[hidden] {
@@ -104,21 +115,22 @@ body::selection {
 }
 
 .sidebar-tools {
-  display: grid;
-  gap: 12px;
-  align-content: start;
-  position: sticky;
-  top: 24px;
-  width: 220px;
-  justify-self: end;
+  flex: 0 0 auto;
+  width: 336px;
 }
 
-.desktop-grid,
+.desktop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 104px);
+  gap: 12px;
+  justify-content: start;
+}
+
 .folder-strip {
   display: grid;
-  grid-template-columns: repeat(2, 104px);
+  grid-template-columns: repeat(auto-fit, minmax(104px, 104px));
   gap: 12px;
-  justify-content: end;
+  justify-content: start;
 }
 
 .folder-strip[hidden] {
@@ -142,7 +154,7 @@ body::selection {
   justify-content: flex-start;
   gap: 10px;
   width: 104px;
-  min-height: 118px;
+  height: 118px;
   padding: 10px 6px 8px;
   border-radius: 24px;
   color: var(--ink);
@@ -223,6 +235,7 @@ body::selection {
 .folder-pill strong {
   min-width: 0;
   max-width: 90px;
+  min-height: 2.4em;
   font-family: "Noto Sans TC", sans-serif;
   font-size: 0.84rem;
   font-weight: 700;
@@ -469,20 +482,23 @@ body::selection {
   }
 
   .workspace-row {
-    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .gallery-stage {
     min-height: auto;
+    max-width: 100%;
   }
 
   .sidebar-tools {
-    position: static;
     width: 100%;
-    justify-self: stretch;
   }
 
-  .desktop-grid,
+  .desktop-grid {
+    grid-template-columns: repeat(3, minmax(96px, 104px));
+    justify-content: start;
+  }
+
   .folder-strip {
     grid-template-columns: repeat(auto-fit, minmax(96px, 104px));
     justify-content: start;
@@ -522,7 +538,7 @@ body::selection {
   .desktop-action,
   .folder-pill {
     width: 96px;
-    min-height: 108px;
+    height: 108px;
     gap: 8px;
     padding: 9px 4px 8px;
     border-radius: 20px;

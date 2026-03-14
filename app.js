@@ -8,6 +8,7 @@ const elements = {
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
   openFolderModal: document.querySelector("#openFolderModal"),
+  homeTrigger: document.querySelector("#homeTrigger"),
   closeFolderModal: document.querySelector("#closeFolderModal"),
   folderModal: document.querySelector("#folderModal"),
   folderForm: document.querySelector("#folderForm"),
@@ -71,6 +72,16 @@ function bindEvents() {
     }
 
     openFolderModal();
+  });
+  elements.homeTrigger?.addEventListener("click", () => {
+    if (state.isBusy) {
+      return;
+    }
+
+    state.selectedFolderId = null;
+    saveSelectedFolder();
+    render();
+    setStatus("全部圖片");
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
@@ -277,9 +288,14 @@ async function uploadSingleFile(file, folderId) {
 }
 
 function render() {
+  renderActions();
   renderFolderList();
   renderGallery();
   renderStats();
+}
+
+function renderActions() {
+  elements.homeTrigger?.classList.toggle("active", !state.selectedFolderId);
 }
 
 function renderFolderList() {
@@ -291,36 +307,6 @@ function renderFolderList() {
 
   elements.folderList.innerHTML = "";
   elements.folderList.hidden = customFolders.length === 0;
-
-  if (customFolders.length > 0) {
-    const homeButton = document.createElement("button");
-    homeButton.type = "button";
-    homeButton.className = `folder-pill${state.selectedFolderId ? "" : " active"}`;
-    homeButton.setAttribute("aria-label", "全部圖片");
-
-    const art = document.createElement("span");
-    art.className = "folder-art";
-    art.setAttribute("aria-hidden", "true");
-    art.innerHTML = getHomeIconMarkup();
-    homeButton.append(art);
-
-    const label = document.createElement("strong");
-    label.textContent = "全部圖片";
-    homeButton.append(label);
-
-    homeButton.addEventListener("click", () => {
-      if (state.isBusy) {
-        return;
-      }
-
-      state.selectedFolderId = null;
-      saveSelectedFolder();
-      render();
-      setStatus("全部圖片");
-    });
-
-    elements.folderList.append(homeButton);
-  }
 
   customFolders.forEach((folder) => {
     const button = document.createElement("button");
@@ -497,6 +483,10 @@ function setBusy(isBusy) {
     elements.openFolderModal.setAttribute("aria-disabled", String(isBusy));
   }
 
+  if (elements.homeTrigger) {
+    elements.homeTrigger.setAttribute("aria-disabled", String(isBusy));
+  }
+
   if (elements.fileInput) {
     elements.fileInput.disabled = isBusy;
   }
@@ -608,16 +598,6 @@ function getFolderIconMarkup() {
     <svg viewBox="0 0 120 120" class="line-icon">
       <path d="M16 42c0-6 5-11 11-11h22l9 10h35c6 0 11 5 11 11v33c0 8-6 14-14 14H30c-8 0-14-6-14-14V42z" />
       <path d="M16 49h88" />
-    </svg>
-  `;
-}
-
-function getHomeIconMarkup() {
-  return `
-    <svg viewBox="0 0 120 120" class="line-icon">
-      <path d="M24 55l36-29 36 29" />
-      <path d="M35 49v42h50V49" />
-      <path d="M51 91V63h18v28" />
     </svg>
   `;
 }

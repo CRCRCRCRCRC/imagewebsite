@@ -14,40 +14,53 @@
   </head>
   <body>
     <main class="desktop-shell">
-      <section class="workspace-row">
-        <section class="gallery-stage" id="galleryStage" hidden>
-          <div class="gallery-grid" id="galleryGrid"></div>
-          <div class="empty-state" id="emptyState" hidden></div>
-        </section>
-
-        <aside class="sidebar-tools">
-          <section class="desktop-grid" aria-label="Actions">
-            <button class="desktop-action desktop-action-primary" id="uploadTrigger" type="button">
-              <span class="icon-surface" aria-hidden="true">
-                <svg viewBox="0 0 120 120" class="line-icon upload-icon">
-                  <path d="M30 81H24c-9 0-16-7-16-16 0-9 7-16 16-16h4c3-15 17-26 33-26 13 0 25 7 31 18h5c10 0 18 8 18 18s-8 18-18 18h-7" />
-                  <path d="M40 54v31h40V54" />
-                  <path d="M50 45l10-11 10 11" />
-                  <path d="M60 34v33" />
-                  <path d="M34 85v13h52V85" />
-                </svg>
-              </span>
-              <strong>上傳圖片</strong>
-            </button>
-
-            <button class="desktop-action desktop-action-primary" id="openFolderModal" type="button">
-              <span class="icon-surface" aria-hidden="true">
-                <svg viewBox="0 0 120 120" class="line-icon folder-icon">
-                  <path d="M16 42c0-6 5-11 11-11h22l9 10h35c6 0 11 5 11 11v33c0 8-6 14-14 14H30c-8 0-14-6-14-14V42z" />
-                  <path d="M16 49h88" />
-                </svg>
-              </span>
-              <strong>新增資料夾</strong>
-            </button>
+      <section class="workspace-stack">
+        <section class="workspace-row">
+          <section class="gallery-stage" id="galleryStage" hidden>
+            <div class="gallery-grid" id="galleryGrid"></div>
+            <div class="empty-state" id="emptyState" hidden></div>
           </section>
 
-          <section class="folder-strip" id="folderList" aria-label="Folders" hidden></section>
-        </aside>
+          <aside class="sidebar-tools">
+            <section class="desktop-grid" aria-label="Actions">
+              <button class="desktop-action desktop-action-primary" id="uploadTrigger" type="button">
+                <span class="icon-surface" aria-hidden="true">
+                  <svg viewBox="0 0 120 120" class="line-icon upload-icon">
+                    <path d="M30 81H24c-9 0-16-7-16-16 0-9 7-16 16-16h4c3-15 17-26 33-26 13 0 25 7 31 18h5c10 0 18 8 18 18s-8 18-18 18h-7" />
+                    <path d="M40 54v31h40V54" />
+                    <path d="M50 45l10-11 10 11" />
+                    <path d="M60 34v33" />
+                    <path d="M34 85v13h52V85" />
+                  </svg>
+                </span>
+                <strong>上傳圖片</strong>
+              </button>
+
+              <button class="desktop-action desktop-action-primary" id="openFolderModal" type="button">
+                <span class="icon-surface" aria-hidden="true">
+                  <svg viewBox="0 0 120 120" class="line-icon folder-icon">
+                    <path d="M16 42c0-6 5-11 11-11h22l9 10h35c6 0 11 5 11 11v33c0 8-6 14-14 14H30c-8 0-14-6-14-14V42z" />
+                    <path d="M16 49h88" />
+                  </svg>
+                </span>
+                <strong>新增資料夾</strong>
+              </button>
+
+              <button class="desktop-action desktop-action-primary" id="homeTrigger" type="button">
+                <span class="icon-surface" aria-hidden="true">
+                  <svg viewBox="0 0 120 120" class="line-icon home-icon">
+                    <path d="M24 55l36-29 36 29" />
+                    <path d="M35 49v42h50V49" />
+                    <path d="M51 91V63h18v28" />
+                  </svg>
+                </span>
+                <strong>全部圖片</strong>
+              </button>
+            </section>
+          </aside>
+        </section>
+
+        <section class="folder-strip" id="folderList" aria-label="Folders" hidden></section>
       </section>
 
       <input id="fileInput" type="file" accept="image/*" multiple hidden />
