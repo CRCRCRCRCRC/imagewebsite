@@ -13,6 +13,11 @@ const elements = {
   folderForm: document.querySelector("#folderForm"),
   folderNameInput: document.querySelector("#folderNameInput"),
   submitFolderForm: document.querySelector("#submitFolderForm"),
+  imageViewer: document.querySelector("#imageViewer"),
+  previewImage: document.querySelector("#previewImage"),
+  closePreview: document.querySelector("#closePreview"),
+  downloadPreview: document.querySelector("#downloadPreview"),
+  copyPreview: document.querySelector("#copyPreview"),
   folderList: document.querySelector("#folderList"),
   galleryStage: document.querySelector("#galleryStage"),
   galleryGrid: document.querySelector("#galleryGrid"),
@@ -29,6 +34,7 @@ const state = {
   images: [],
   selectedFolderId: null,
   isBusy: false,
+  activePreview: null,
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -68,6 +74,9 @@ function bindEvents() {
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
+  elements.closePreview?.addEventListener("click", closeImageViewer);
+  elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
+  elements.copyPreview?.addEventListener("click", handleCopyPreview);
 
   elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
@@ -75,7 +84,18 @@ function bindEvents() {
     }
   });
 
+  elements.imageViewer?.addEventListener("click", (event) => {
+    if (event.target === elements.imageViewer) {
+      closeImageViewer();
+    }
+  });
+
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isImageViewerOpen()) {
+      closeImageViewer();
+      return;
+    }
+
     if (event.key === "Escape" && elements.folderModal?.classList.contains("open")) {
       closeFolderModal();
     }
@@ -92,6 +112,31 @@ function closeFolderModal() {
   elements.folderModal?.classList.remove("open");
   elements.folderModal?.setAttribute("aria-hidden", "true");
   elements.folderForm?.reset();
+}
+
+function openImageViewer(image) {
+  state.activePreview = image;
+
+  if (elements.previewImage) {
+    elements.previewImage.src = image.url;
+    elements.previewImage.alt = image.name || "";
+  }
+
+  elements.imageViewer?.classList.add("open");
+  elements.imageViewer?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("viewer-open");
+}
+
+function closeImageViewer() {
+  state.activePreview = null;
+  elements.imageViewer?.classList.remove("open");
+  elements.imageViewer?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("viewer-open");
+
+  if (elements.previewImage) {
+    elements.previewImage.src = "";
+    elements.previewImage.alt = "";
+  }
 }
 
 async function handleCreateFolder(event) {
@@ -290,17 +335,20 @@ function renderGallery() {
   elements.galleryStage.hidden = images.length === 0;
 
   images.forEach((image) => {
-    const article = document.createElement("article");
-    article.className = "gallery-item";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "gallery-item";
+    button.setAttribute("aria-label", image.name || "開啟圖片");
 
     const img = document.createElement("img");
-    img.src = image.url;
+    img.src = image.thumbnailUrl || image.url;
     img.alt = "";
     img.loading = "lazy";
     img.decoding = "async";
 
-    article.append(img);
-    elements.galleryGrid?.append(article);
+    button.addEventListener("click", () => openImageViewer(image));
+    button.append(img);
+    elements.galleryGrid?.append(button);
   });
 
   if (elements.emptyState) {
@@ -432,6 +480,95 @@ function setBusy(isBusy) {
 
   if (elements.submitFolderForm) {
     elements.submitFolderForm.disabled = isBusy;
+  }
+}
+
+function isImageViewerOpen() {
+  return elements.imageViewer?.classList.contains("open");
+}
+
+async function handleDownloadPreview() {
+  if (!state.activePreview) {
+    return;
+  }
+
+  try {
+    setViewerBusy(true);
+    const fileBlob = await fetchPreviewBlob();
+    const objectUrl = URL.createObjectURL(fileBlob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = state.activePreview.name || "image";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+    setStatus("圖片已下載。");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "下載失敗。", true);
+  } finally {
+    setViewerBusy(false);
+  }
+}
+
+async function handleCopyPreview() {
+  if (!state.activePreview) {
+    return;
+  }
+
+  try {
+    setViewerBusy(true);
+    const fileBlob = await fetchPreviewBlob();
+
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [fileBlob.type || "image/png"]: fileBlob,
+        }),
+      ]);
+      setStatus("圖片已複製。");
+      return;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(state.activePreview.url);
+      setStatus("已複製圖片網址。");
+      return;
+    }
+
+    throw new Error("目前瀏覽器不支援複製。");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "複製失敗。", true);
+  } finally {
+    setViewerBusy(false);
+  }
+}
+
+async function fetchPreviewBlob() {
+  if (!state.activePreview) {
+    throw new Error("目前沒有可用的圖片。");
+  }
+
+  const response = await fetch(state.activePreview.url, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("讀取圖片失敗。");
+  }
+
+  return response.blob();
+}
+
+function setViewerBusy(isBusy) {
+  if (elements.downloadPreview) {
+    elements.downloadPreview.disabled = isBusy;
+  }
+
+  if (elements.copyPreview) {
+    elements.copyPreview.disabled = isBusy;
   }
 }
 

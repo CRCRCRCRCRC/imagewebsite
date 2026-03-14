@@ -71,11 +71,13 @@ body::selection {
   justify-content: center;
   height: 220px;
   padding: 12px;
+  appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.48);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
+  cursor: zoom-in;
   transition:
     transform var(--ease-smooth),
     box-shadow var(--ease-smooth),
@@ -88,6 +90,7 @@ body::selection {
   height: 100%;
   max-width: min(100%, calc(100vw - 140px));
   border-radius: 20px;
+  pointer-events: none;
 }
 
 .gallery-item:hover {
@@ -267,6 +270,87 @@ body::selection {
   opacity: 1;
 }
 
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(7, 13, 24, 0.68);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--ease-smooth),
+    visibility var(--ease-smooth);
+}
+
+.image-viewer.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.image-viewer-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 1120px);
+  max-height: calc(100vh - 56px);
+  padding: 72px 24px 24px;
+  border-radius: 34px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 36px 72px rgba(7, 13, 24, 0.34);
+}
+
+.image-viewer-shell img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 152px);
+  border-radius: 24px;
+}
+
+.image-viewer-toolbar {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  gap: 10px;
+}
+
+.viewer-icon-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #f5f8ff;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition:
+    transform var(--ease-smooth),
+    background var(--ease-smooth),
+    box-shadow var(--ease-smooth);
+}
+
+.viewer-icon-button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 14px 24px rgba(7, 13, 24, 0.2);
+}
+
+.viewer-icon-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 3px;
+}
+
+.viewer-open {
+  overflow: hidden;
+}
+
 .folder-form {
   display: grid;
   gap: 18px;
@@ -404,6 +488,26 @@ body::selection {
   .gallery-item {
     height: 160px;
     max-width: 100%;
+  }
+
+  .image-viewer {
+    padding: 12px;
+  }
+
+  .image-viewer-shell {
+    padding: 68px 12px 12px;
+    border-radius: 24px;
+  }
+
+  .image-viewer-toolbar {
+    top: 12px;
+    right: 12px;
+  }
+
+  .viewer-icon-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
   }
 
   .desktop-action,

@@ -93,6 +93,34 @@
       </section>
     </div>
 
+    <div class="image-viewer" id="imageViewer" aria-hidden="true">
+      <section class="image-viewer-shell" role="dialog" aria-modal="true" aria-label="圖片預覽">
+        <div class="image-viewer-toolbar">
+          <button type="button" class="viewer-icon-button" id="downloadPreview" aria-label="下載圖片">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <path d="M12 4v10" />
+              <path d="M8 10l4 4 4-4" />
+              <path d="M5 18h14" />
+            </svg>
+          </button>
+          <button type="button" class="viewer-icon-button" id="copyPreview" aria-label="複製圖片">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <rect x="9" y="9" width="10" height="10" rx="2" />
+              <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <button type="button" class="viewer-icon-button" id="closePreview" aria-label="關閉預覽">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <path d="M6 6l12 12" />
+              <path d="M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <img id="previewImage" alt="" />
+      </section>
+    </div>
+
     <script type="module" src="./app.js"></script>
   </body>
 </html>
