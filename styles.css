@@ -193,7 +193,6 @@ body::selection {
 
 .desktop-action:hover,
 .folder-pill:hover,
-.folder-pill.active,
 .ghost-button:hover,
 .solid-button:hover {
   transform: translateY(-3px);
@@ -207,9 +206,18 @@ body::selection {
   box-shadow: 0 18px 34px rgba(18, 48, 94, 0.16);
 }
 
-.folder-strip .folder-pill:hover,
-.folder-strip .folder-pill.active {
+.folder-strip .folder-pill:hover {
   transform: translateY(-8px) scale(1.03);
+}
+
+.folder-strip .folder-pill.active {
+  box-shadow:
+    0 18px 34px rgba(18, 48, 94, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.folder-pill-home {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .desktop-action:active,

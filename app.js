@@ -292,6 +292,36 @@ function renderFolderList() {
   elements.folderList.innerHTML = "";
   elements.folderList.hidden = customFolders.length === 0;
 
+  if (state.selectedFolderId) {
+    const homeButton = document.createElement("button");
+    homeButton.type = "button";
+    homeButton.className = "folder-pill folder-pill-home";
+    homeButton.setAttribute("aria-label", "返回首頁");
+
+    const art = document.createElement("span");
+    art.className = "folder-art";
+    art.setAttribute("aria-hidden", "true");
+    art.innerHTML = getHomeIconMarkup();
+    homeButton.append(art);
+
+    const label = document.createElement("strong");
+    label.textContent = "返回首頁";
+    homeButton.append(label);
+
+    homeButton.addEventListener("click", () => {
+      if (state.isBusy) {
+        return;
+      }
+
+      state.selectedFolderId = null;
+      saveSelectedFolder();
+      render();
+      setStatus("全部圖片");
+    });
+
+    elements.folderList.append(homeButton);
+  }
+
   customFolders.forEach((folder) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -578,6 +608,16 @@ function getFolderIconMarkup() {
     <svg viewBox="0 0 120 120" class="line-icon">
       <path d="M16 42c0-6 5-11 11-11h22l9 10h35c6 0 11 5 11 11v33c0 8-6 14-14 14H30c-8 0-14-6-14-14V42z" />
       <path d="M16 49h88" />
+    </svg>
+  `;
+}
+
+function getHomeIconMarkup() {
+  return `
+    <svg viewBox="0 0 120 120" class="line-icon">
+      <path d="M24 55l36-29 36 29" />
+      <path d="M35 49v42h50V49" />
+      <path d="M51 91V63h18v28" />
     </svg>
   `;
 }
