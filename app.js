@@ -8,7 +8,6 @@ const elements = {
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
   openFolderModal: document.querySelector("#openFolderModal"),
-  homeTrigger: document.querySelector("#homeTrigger"),
   closeFolderModal: document.querySelector("#closeFolderModal"),
   folderModal: document.querySelector("#folderModal"),
   folderForm: document.querySelector("#folderForm"),
@@ -72,16 +71,6 @@ function bindEvents() {
     }
 
     openFolderModal();
-  });
-  elements.homeTrigger?.addEventListener("click", () => {
-    if (state.isBusy) {
-      return;
-    }
-
-    state.selectedFolderId = null;
-    saveSelectedFolder();
-    render();
-    setStatus("全部圖片");
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
@@ -288,14 +277,9 @@ async function uploadSingleFile(file, folderId) {
 }
 
 function render() {
-  renderActions();
   renderFolderList();
   renderGallery();
   renderStats();
-}
-
-function renderActions() {
-  elements.homeTrigger?.classList.toggle("active", !state.selectedFolderId);
 }
 
 function renderFolderList() {
@@ -481,10 +465,6 @@ function setBusy(isBusy) {
 
   if (elements.openFolderModal) {
     elements.openFolderModal.setAttribute("aria-disabled", String(isBusy));
-  }
-
-  if (elements.homeTrigger) {
-    elements.homeTrigger.setAttribute("aria-disabled", String(isBusy));
   }
 
   if (elements.fileInput) {

@@ -50,7 +50,7 @@ body::selection {
 .workspace-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   gap: 18px;
   width: fit-content;
   max-width: 100%;
@@ -116,12 +116,13 @@ body::selection {
 
 .sidebar-tools {
   flex: 0 0 auto;
-  width: 336px;
+  width: 220px;
+  align-self: center;
 }
 
 .desktop-grid {
   display: grid;
-  grid-template-columns: repeat(3, 104px);
+  grid-template-columns: repeat(2, 104px);
   gap: 12px;
   justify-content: start;
 }
@@ -508,6 +509,7 @@ body::selection {
 
   .workspace-row {
     width: 100%;
+    align-items: flex-start;
   }
 
   .gallery-stage {
@@ -517,10 +519,11 @@ body::selection {
 
   .sidebar-tools {
     width: 100%;
+    align-self: auto;
   }
 
   .desktop-grid {
-    grid-template-columns: repeat(3, minmax(96px, 104px));
+    grid-template-columns: repeat(2, minmax(96px, 104px));
     justify-content: start;
   }
 
