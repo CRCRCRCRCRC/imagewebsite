@@ -1,6 +1,7 @@
 const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
 const ROOT_FOLDER_NAME = "我的圖片";
 const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
+const LIBRARY_CACHE_KEY = "image-space-library";
 const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 
 const elements = {
@@ -34,6 +35,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
+  restoreLibraryCache();
   setBusy(true);
 
   try {
@@ -191,29 +193,25 @@ async function handleUpload(event) {
 }
 
 async function refreshLibrary(preferredFolderId = state.selectedFolderId) {
-  const response = await fetch("/api/library", {
-    cache: "no-store",
-  });
+  try {
+    const response = await fetch("/api/library", {
+      cache: "no-store",
+    });
 
-  const payload = await parseJson(response);
-  if (!response.ok) {
-    throw new Error(payload.error || "讀取資料失敗。");
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "讀取資料失敗。");
+    }
+
+    applyLibraryPayload(payload, preferredFolderId);
+    saveLibraryCache();
+  } catch (error) {
+    if (restoreLibraryCache(preferredFolderId)) {
+      return;
+    }
+
+    throw error;
   }
-
-  state.folders = payload.folders || [];
-  state.images = payload.images || [];
-
-  const savedFolderId = localStorage.getItem(SELECTED_FOLDER_KEY);
-  const nextFolderId = preferredFolderId ?? savedFolderId;
-
-  if (nextFolderId && state.folders.some((folder) => folder.id === nextFolderId && folder.id !== ROOT_FOLDER_ID)) {
-    state.selectedFolderId = nextFolderId;
-  } else {
-    state.selectedFolderId = null;
-  }
-
-  saveSelectedFolder();
-  render();
 }
 
 async function uploadSingleFile(file, folderId) {
@@ -272,7 +270,7 @@ function renderFolderList() {
       state.selectedFolderId = state.selectedFolderId === folder.id ? null : folder.id;
       saveSelectedFolder();
       render();
-      setStatus(state.selectedFolderId ? folder.name : "首頁");
+      setStatus(state.selectedFolderId ? folder.name : "全部圖片");
     });
 
     elements.folderList?.append(button);
@@ -284,8 +282,10 @@ function renderGallery() {
     return;
   }
 
-  const viewedFolderId = getViewedFolderId();
-  const images = state.images.filter((image) => image.folderId === viewedFolderId);
+  const images = state.selectedFolderId
+    ? state.images.filter((image) => image.folderId === state.selectedFolderId)
+    : state.images;
+
   elements.galleryGrid.innerHTML = "";
   elements.galleryStage.hidden = images.length === 0;
 
@@ -307,17 +307,13 @@ function renderGallery() {
     elements.emptyState.hidden = true;
   }
 
-  updateText(elements.currentFolderName, state.selectedFolderId ? getSelectedFolder()?.name || "" : "首頁");
+  updateText(elements.currentFolderName, state.selectedFolderId ? getSelectedFolder()?.name || "" : "全部圖片");
   updateText(elements.galleryCount, String(images.length));
 }
 
 function renderStats() {
   updateText(elements.folderCount, String(state.folders.length));
   updateText(elements.imageCount, String(state.images.length));
-}
-
-function getViewedFolderId() {
-  return state.selectedFolderId || ROOT_FOLDER_ID;
 }
 
 function getUploadFolder() {
@@ -339,6 +335,50 @@ function saveSelectedFolder() {
   }
 
   localStorage.setItem(SELECTED_FOLDER_KEY, state.selectedFolderId);
+}
+
+function applyLibraryPayload(payload, preferredFolderId = state.selectedFolderId) {
+  state.folders = Array.isArray(payload.folders) ? payload.folders : [];
+  state.images = Array.isArray(payload.images) ? payload.images : [];
+
+  const savedFolderId = localStorage.getItem(SELECTED_FOLDER_KEY);
+  const nextFolderId = preferredFolderId ?? savedFolderId;
+
+  if (nextFolderId && state.folders.some((folder) => folder.id === nextFolderId && folder.id !== ROOT_FOLDER_ID)) {
+    state.selectedFolderId = nextFolderId;
+  } else {
+    state.selectedFolderId = null;
+  }
+
+  saveSelectedFolder();
+  render();
+}
+
+function saveLibraryCache() {
+  localStorage.setItem(
+    LIBRARY_CACHE_KEY,
+    JSON.stringify({
+      folders: state.folders,
+      images: state.images,
+    }),
+  );
+}
+
+function restoreLibraryCache(preferredFolderId = state.selectedFolderId) {
+  const cached = localStorage.getItem(LIBRARY_CACHE_KEY);
+  if (!cached) {
+    return false;
+  }
+
+  try {
+    const payload = JSON.parse(cached);
+    applyLibraryPayload(payload, preferredFolderId);
+    return true;
+  } catch (error) {
+    console.error(error);
+    localStorage.removeItem(LIBRARY_CACHE_KEY);
+    return false;
+  }
 }
 
 function setStatus(message, isError = false) {
