@@ -76,7 +76,7 @@ function bindEvents() {
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
-  elements.renamePreview?.addEventListener("click", handleRenamePreview);
+elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
   elements.copyPreview?.addEventListener("click", handleCopyPreview);
@@ -588,6 +588,63 @@ async function handleCopyPreview() {
   } catch (error) {
     console.error(error);
     setStatus(error.message || "複製失敗。", true);
+  } finally {
+    setViewerBusy(false);
+  }
+}
+
+async function handleRenamePreviewFast() {
+  if (!state.activePreview) {
+    return;
+  }
+
+  const imageId = state.activePreview.id;
+  const previousName = state.activePreview.name || "";
+  const nextName = window.prompt("重新命名圖片", previousName);
+  if (nextName === null) {
+    return;
+  }
+
+  const normalizedName = normalizeImageName(nextName);
+  if (!normalizedName) {
+    setStatus("圖片名稱不能是空的。", true);
+    return;
+  }
+
+  if (normalizedName === previousName) {
+    return;
+  }
+
+  try {
+    setViewerBusy(true);
+    applyRenamedImage(imageId, normalizedName);
+
+    const response = await fetch("/api/images", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageId,
+        name: normalizedName,
+      }),
+    });
+
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "重新命名失敗。");
+    }
+
+    const confirmedName = payload.image?.name || normalizedName;
+    if (confirmedName !== normalizedName) {
+      applyRenamedImage(imageId, confirmedName);
+    }
+
+    setStatus(`圖片已重新命名為 ${confirmedName}。`);
+  } catch (error) {
+    applyRenamedImage(imageId, previousName);
+    console.error(error);
+    setStatus(error.message || "重新命名失敗。", true);
   } finally {
     setViewerBusy(false);
   }
