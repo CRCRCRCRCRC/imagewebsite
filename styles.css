@@ -2,6 +2,7 @@
   --sky-top: #e8eef8;
   --sky-mid: #b7d0f2;
   --sky-bottom: #6da2ec;
+  --gallery-image-height: 320px;
   --ink: #0f1a2b;
   --ink-soft: rgba(15, 26, 43, 0.72);
   --surface: rgba(255, 255, 255, 0.26);
@@ -78,11 +79,11 @@ body::selection {
   position: relative;
   display: inline-grid;
   flex: 0 0 auto;
+  justify-items: center;
   align-items: start;
   gap: 12px;
   width: fit-content;
   height: auto;
-  max-width: min(420px, calc(100vw - 120px));
   padding: 0;
   appearance: none;
   border: 0;
@@ -95,10 +96,11 @@ body::selection {
 }
 
 .gallery-media {
-  display: grid;
-  place-items: center;
-  height: 320px;
-  max-width: min(420px, calc(100vw - 120px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: min(720px, calc(100vw - 120px));
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.48);
   border-radius: 28px;
@@ -112,10 +114,10 @@ body::selection {
 
 .gallery-item img {
   display: block;
-  width: auto;
-  height: 100%;
-  max-width: min(100%, 392px, calc(100vw - 140px));
-  max-height: 100%;
+  width: auto !important;
+  height: var(--gallery-image-height) !important;
+  max-width: min(720px, calc(100vw - 148px));
+  max-height: none;
   object-fit: contain;
   border-radius: 20px;
   pointer-events: none;
@@ -123,8 +125,8 @@ body::selection {
 
 .gallery-name {
   display: block;
-  width: 100%;
-  max-width: min(420px, calc(100vw - 120px));
+  width: fit-content;
+  max-width: min(720px, calc(100vw - 120px));
   padding-top: 12px;
   overflow: hidden;
   color: var(--ink);
@@ -563,6 +565,10 @@ body::selection {
 }
 
 @media (max-width: 920px) {
+  :root {
+    --gallery-image-height: 270px;
+  }
+
   .desktop-shell {
     padding: 20px 16px 154px;
   }
@@ -603,19 +609,23 @@ body::selection {
   }
 
   .gallery-media {
-    height: 270px;
+    max-width: min(560px, calc(100vw - 72px));
   }
 }
 
 @media (max-width: 640px) {
+  :root {
+    --gallery-image-height: 230px;
+  }
+
   .gallery-item {
     gap: 8px;
     max-width: 100%;
   }
 
   .gallery-media {
-    height: 230px;
     padding: 12px;
+    max-width: calc(100vw - 48px);
   }
 
   .image-viewer {
