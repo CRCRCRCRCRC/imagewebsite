@@ -74,33 +74,34 @@ body::selection {
 }
 
 .gallery-item {
-  overflow: hidden;
+  overflow: visible;
   position: relative;
-  display: inline-flex;
+  display: inline-grid;
   flex: 0 0 auto;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  height: 320px;
-  padding: 14px;
+  align-items: start;
+  gap: 12px;
+  height: auto;
+  padding: 0;
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   cursor: zoom-in;
   transition:
     transform var(--ease-smooth),
-    box-shadow var(--ease-smooth),
-    border-color var(--ease-smooth);
+    box-shadow var(--ease-smooth);
 }
 
 .gallery-media {
   display: grid;
   place-items: center;
-  flex: 1;
-  min-height: 0;
+  height: 320px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
 }
 
 .gallery-item img {
@@ -109,13 +110,14 @@ body::selection {
   height: 100%;
   max-width: min(100%, calc(100vw - 140px));
   max-height: 100%;
+  object-fit: contain;
   border-radius: 20px;
   pointer-events: none;
 }
 
 .gallery-name {
   display: block;
-  width: 100%;
+  max-width: 100%;
   padding-top: 12px;
   overflow: hidden;
   color: var(--ink);
@@ -123,13 +125,16 @@ body::selection {
   font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.2;
-  text-align: left;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .gallery-item:hover {
   transform: translateY(-4px);
+}
+
+.gallery-item:hover .gallery-media {
   border-color: rgba(255, 255, 255, 0.68);
   box-shadow: 0 30px 56px rgba(18, 48, 94, 0.18);
 }
@@ -587,14 +592,23 @@ body::selection {
   }
 
   .gallery-item {
+    gap: 10px;
+  }
+
+  .gallery-media {
     height: 270px;
   }
 }
 
 @media (max-width: 640px) {
   .gallery-item {
-    height: 230px;
+    gap: 8px;
     max-width: 100%;
+  }
+
+  .gallery-media {
+    height: 230px;
+    padding: 12px;
   }
 
   .image-viewer {
