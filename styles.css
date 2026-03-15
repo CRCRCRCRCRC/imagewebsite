@@ -152,18 +152,45 @@ body::selection {
 
 .sidebar-tools {
   position: fixed;
-  right: 34px;
+  left: 34px;
   bottom: 170px;
   z-index: 18;
-  width: 104px;
+  width: max-content;
   transform: none;
 }
 
 .desktop-grid {
   display: grid;
-  grid-template-columns: 104px;
-  gap: 12px;
+  grid-auto-flow: column;
+  grid-auto-columns: 86px;
+  gap: 10px;
   justify-content: start;
+}
+
+.sidebar-tools .desktop-action {
+  width: 86px;
+  height: 92px;
+  gap: 7px;
+  padding: 8px 5px 6px;
+  border-radius: 22px;
+}
+
+.sidebar-tools .icon-surface {
+  width: 50px;
+  height: 50px;
+  border-radius: 18px;
+}
+
+.sidebar-tools .line-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.sidebar-tools .desktop-action strong {
+  max-width: 76px;
+  min-height: auto;
+  font-size: 0.78rem;
+  line-height: 1.15;
 }
 
 .folder-strip {
@@ -889,6 +916,8 @@ body::selection {
   }
 
   .desktop-grid {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
     grid-template-columns: repeat(2, minmax(96px, 104px));
     justify-content: start;
   }
