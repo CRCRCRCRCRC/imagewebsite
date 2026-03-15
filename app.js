@@ -7,6 +7,12 @@ const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 const elements = {
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
+  uploadModal: document.querySelector("#uploadModal"),
+  closeUploadModal: document.querySelector("#closeUploadModal"),
+  uploadDropzone: document.querySelector("#uploadDropzone"),
+  chooseUploadFiles: document.querySelector("#chooseUploadFiles"),
+  submitUploadQueue: document.querySelector("#submitUploadQueue"),
+  uploadQueue: document.querySelector("#uploadQueue"),
   openFolderModal: document.querySelector("#openFolderModal"),
   closeFolderModal: document.querySelector("#closeFolderModal"),
   folderModal: document.querySelector("#folderModal"),
@@ -37,6 +43,7 @@ const state = {
   selectedFolderId: null,
   isBusy: false,
   activePreview: null,
+  uploadQueue: [],
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -63,10 +70,31 @@ function bindEvents() {
       return;
     }
 
-    elements.fileInput?.click();
+    openUploadModal();
   });
 
-  elements.fileInput?.addEventListener("change", handleUpload);
+  elements.fileInput?.addEventListener("change", handleUploadSelection);
+  elements.closeUploadModal?.addEventListener("click", () => closeUploadModal());
+  elements.chooseUploadFiles?.addEventListener("click", () => {
+    if (state.isBusy) {
+      return;
+    }
+
+    elements.fileInput?.click();
+  });
+  elements.submitUploadQueue?.addEventListener("click", handleUploadQueueSubmit);
+  elements.uploadDropzone?.addEventListener("click", () => {
+    if (state.isBusy) {
+      return;
+    }
+
+    elements.fileInput?.click();
+  });
+  elements.uploadDropzone?.addEventListener("keydown", handleUploadDropzoneKeydown);
+  elements.uploadDropzone?.addEventListener("dragenter", handleUploadDragEnter);
+  elements.uploadDropzone?.addEventListener("dragover", handleUploadDragOver);
+  elements.uploadDropzone?.addEventListener("dragleave", handleUploadDragLeave);
+  elements.uploadDropzone?.addEventListener("drop", handleUploadDrop);
   elements.openFolderModal?.addEventListener("click", () => {
     if (state.isBusy) {
       return;
@@ -87,15 +115,28 @@ elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
     }
   });
 
+  elements.uploadModal?.addEventListener("click", (event) => {
+    if (event.target === elements.uploadModal) {
+      closeUploadModal();
+    }
+  });
+
   elements.imageViewer?.addEventListener("click", (event) => {
     if (event.target === elements.imageViewer) {
       closeImageViewer();
     }
   });
 
+  document.addEventListener("paste", handleUploadPaste);
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isImageViewerOpen()) {
       closeImageViewer();
+      return;
+    }
+
+    if (event.key === "Escape" && isUploadModalOpen()) {
+      closeUploadModal();
       return;
     }
 
@@ -111,10 +152,40 @@ function openFolderModal() {
   requestAnimationFrame(() => elements.folderNameInput?.focus());
 }
 
+function openUploadModal() {
+  elements.uploadModal?.classList.add("open");
+  elements.uploadModal?.setAttribute("aria-hidden", "false");
+  renderUploadQueue();
+  requestAnimationFrame(() => elements.uploadDropzone?.focus());
+}
+
+function closeUploadModal({ clearQueue = true, force = false } = {}) {
+  if (state.isBusy && !force) {
+    return;
+  }
+
+  elements.uploadModal?.classList.remove("open");
+  elements.uploadModal?.setAttribute("aria-hidden", "true");
+  setUploadDropActive(false);
+
+  if (elements.fileInput) {
+    elements.fileInput.value = "";
+  }
+
+  if (clearQueue) {
+    state.uploadQueue = [];
+    renderUploadQueue();
+  }
+}
+
 function closeFolderModal() {
   elements.folderModal?.classList.remove("open");
   elements.folderModal?.setAttribute("aria-hidden", "true");
   elements.folderForm?.reset();
+}
+
+function isUploadModalOpen() {
+  return elements.uploadModal?.classList.contains("open");
 }
 
 function openImageViewer(image) {
@@ -192,6 +263,268 @@ async function handleCreateFolder(event) {
   } finally {
     setBusy(false);
   }
+}
+
+function handleUploadSelection(event) {
+  const files = Array.from(event.target.files ?? []);
+  if (elements.fileInput) {
+    elements.fileInput.value = "";
+  }
+
+  if (files.length === 0) {
+    return;
+  }
+
+  if (!isUploadModalOpen()) {
+    openUploadModal();
+  }
+
+  addFilesToUploadQueue(files);
+}
+
+function handleUploadDropzoneKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  event.preventDefault();
+  if (state.isBusy) {
+    return;
+  }
+
+  elements.fileInput?.click();
+}
+
+function handleUploadDragEnter(event) {
+  event.preventDefault();
+  if (state.isBusy) {
+    return;
+  }
+
+  setUploadDropActive(true);
+}
+
+function handleUploadDragOver(event) {
+  event.preventDefault();
+  if (state.isBusy) {
+    return;
+  }
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  setUploadDropActive(true);
+}
+
+function handleUploadDragLeave(event) {
+  if (!elements.uploadDropzone) {
+    return;
+  }
+
+  if (event.currentTarget === event.target || !elements.uploadDropzone.contains(event.relatedTarget)) {
+    setUploadDropActive(false);
+  }
+}
+
+function handleUploadDrop(event) {
+  event.preventDefault();
+  setUploadDropActive(false);
+
+  if (state.isBusy) {
+    return;
+  }
+
+  const files = extractImageFiles(event.dataTransfer);
+  if (files.length === 0) {
+    setStatus("請拖曳圖片檔。", true);
+    return;
+  }
+
+  addFilesToUploadQueue(files);
+}
+
+function handleUploadPaste(event) {
+  if (!isUploadModalOpen() || state.isBusy) {
+    return;
+  }
+
+  const files = extractImageFiles(event.clipboardData);
+  if (files.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  addFilesToUploadQueue(files);
+}
+
+function extractImageFiles(dataTransfer) {
+  if (!dataTransfer) {
+    return [];
+  }
+
+  const files = Array.from(dataTransfer.files ?? []).filter((file) => file.type.startsWith("image/"));
+  if (files.length > 0) {
+    return files;
+  }
+
+  return Array.from(dataTransfer.items ?? [])
+    .map((item) => (item.kind === "file" ? item.getAsFile() : null))
+    .filter((file) => file && file.type.startsWith("image/"));
+}
+
+function addFilesToUploadQueue(files) {
+  const accepted = [];
+  const existingKeys = new Set(state.uploadQueue.map(getUploadQueueKey));
+  let rejectedType = 0;
+  let rejectedSize = 0;
+  let rejectedDuplicate = 0;
+
+  files.forEach((file) => {
+    if (!file.type.startsWith("image/")) {
+      rejectedType += 1;
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      rejectedSize += 1;
+      return;
+    }
+
+    const fileKey = getUploadQueueKey(file);
+    if (existingKeys.has(fileKey)) {
+      rejectedDuplicate += 1;
+      return;
+    }
+
+    existingKeys.add(fileKey);
+    accepted.push(file);
+  });
+
+  if (accepted.length > 0) {
+    state.uploadQueue = [...state.uploadQueue, ...accepted];
+    renderUploadQueue();
+  }
+
+  if (accepted.length === 0) {
+    if (rejectedSize > 0) {
+      setStatus("圖片超過 4.5 MB，沒有加入上傳清單。", true);
+      return;
+    }
+
+    if (rejectedType > 0) {
+      setStatus("只能加入圖片檔。", true);
+      return;
+    }
+
+    if (rejectedDuplicate > 0) {
+      setStatus("這些圖片已經在上傳清單裡了。", true);
+    }
+
+    return;
+  }
+
+  const notices = [`已加入 ${accepted.length} 張圖片。`];
+  if (rejectedDuplicate > 0) {
+    notices.push(`略過 ${rejectedDuplicate} 張重複圖片。`);
+  }
+
+  if (rejectedSize > 0) {
+    notices.push(`略過 ${rejectedSize} 張超過 4.5 MB 的圖片。`);
+  }
+
+  if (rejectedType > 0) {
+    notices.push(`略過 ${rejectedType} 個非圖片檔案。`);
+  }
+
+  setStatus(notices.join(" "));
+}
+
+function getUploadQueueKey(file) {
+  return [file.name, file.size, file.lastModified].join("::");
+}
+
+function renderUploadQueue() {
+  if (!elements.uploadQueue || !elements.submitUploadQueue) {
+    return;
+  }
+
+  const files = state.uploadQueue;
+  elements.uploadQueue.hidden = files.length === 0;
+  elements.submitUploadQueue.disabled = files.length === 0 || state.isBusy;
+  elements.submitUploadQueue.setAttribute("aria-disabled", String(files.length === 0 || state.isBusy));
+
+  elements.uploadQueue.innerHTML = "";
+  if (files.length === 0) {
+    return;
+  }
+
+  const summary = document.createElement("p");
+  summary.className = "upload-queue-summary";
+  summary.textContent = `已加入 ${files.length} 張圖片`;
+  elements.uploadQueue.append(summary);
+
+  const list = document.createElement("div");
+  list.className = "upload-queue-list";
+
+  files.forEach((file, index) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "upload-queue-chip";
+    chip.textContent = file.name;
+    chip.title = `移除 ${file.name}`;
+    chip.addEventListener("click", () => removeUploadQueueFile(index));
+    list.append(chip);
+  });
+
+  elements.uploadQueue.append(list);
+}
+
+function removeUploadQueueFile(index) {
+  state.uploadQueue = state.uploadQueue.filter((_, queuedIndex) => queuedIndex !== index);
+  renderUploadQueue();
+}
+
+async function handleUploadQueueSubmit() {
+  if (state.isBusy) {
+    return;
+  }
+
+  if (state.uploadQueue.length === 0) {
+    setStatus("先加入至少一張圖片。", true);
+    return;
+  }
+
+  const targetFolder = getUploadFolder();
+  if (!targetFolder) {
+    setStatus("找不到上傳目標資料夾。", true);
+    return;
+  }
+
+  try {
+    setBusy(true);
+
+    let completed = 0;
+    for (const file of state.uploadQueue) {
+      completed += 1;
+      setStatus(`上傳圖片 ${completed}/${state.uploadQueue.length}`);
+      await uploadSingleFile(file, targetFolder.id);
+    }
+
+    await refreshLibrary(state.selectedFolderId);
+    setStatus(`已上傳 ${state.uploadQueue.length} 張圖片。`);
+    closeUploadModal({ force: true });
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "上傳失敗。", true);
+  } finally {
+    setBusy(false);
+    renderUploadQueue();
+  }
+}
+
+function setUploadDropActive(isActive) {
+  elements.uploadDropzone?.classList.toggle("drag-active", isActive);
 }
 
 async function handleUpload(event) {
@@ -517,6 +850,22 @@ function setBusy(isBusy) {
     elements.fileInput.disabled = isBusy;
   }
 
+  if (elements.closeUploadModal) {
+    elements.closeUploadModal.disabled = isBusy;
+  }
+
+  if (elements.chooseUploadFiles) {
+    elements.chooseUploadFiles.disabled = isBusy;
+  }
+
+  if (elements.submitUploadQueue) {
+    elements.submitUploadQueue.disabled = isBusy || state.uploadQueue.length === 0;
+  }
+
+  if (elements.uploadDropzone) {
+    elements.uploadDropzone.setAttribute("aria-disabled", String(isBusy));
+  }
+
   if (elements.closeFolderModal) {
     elements.closeFolderModal.disabled = isBusy;
   }
@@ -528,6 +877,8 @@ function setBusy(isBusy) {
   if (elements.submitFolderForm) {
     elements.submitFolderForm.disabled = isBusy;
   }
+
+  renderUploadQueue();
 }
 
 function isImageViewerOpen() {

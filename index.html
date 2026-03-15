@@ -55,6 +55,37 @@
 
       <input id="fileInput" type="file" accept="image/*" multiple hidden />
 
+      <div class="modal-backdrop" id="uploadModal" aria-hidden="true">
+        <section class="modal-card upload-modal-card" role="dialog" aria-modal="true" aria-label="上傳圖片">
+          <div class="upload-modal-copy">
+            <p class="upload-modal-title">上傳圖片</p>
+            <p class="upload-modal-subtitle">貼上、拖曳，或從本機一次選多張。</p>
+          </div>
+
+          <div class="upload-dropzone" id="uploadDropzone" tabindex="0" role="button" aria-label="拖曳、貼上或選擇圖片">
+            <span class="upload-dropzone-icon" aria-hidden="true">
+              <svg viewBox="0 0 120 120" class="line-icon upload-icon">
+                <path d="M30 81H24c-9 0-16-7-16-16 0-9 7-16 16-16h4c3-15 17-26 33-26 13 0 25 7 31 18h5c10 0 18 8 18 18s-8 18-18 18h-7" />
+                <path d="M40 54v31h40V54" />
+                <path d="M50 45l10-11 10 11" />
+                <path d="M60 34v33" />
+                <path d="M34 85v13h52V85" />
+              </svg>
+            </span>
+            <strong>把圖片拖到這裡</strong>
+            <span>也可以直接貼上圖片</span>
+          </div>
+
+          <div class="upload-queue" id="uploadQueue" hidden></div>
+
+          <div class="modal-actions upload-modal-actions">
+            <button type="button" class="ghost-button upload-text-button" id="closeUploadModal">取消</button>
+            <button type="button" class="ghost-button upload-text-button" id="chooseUploadFiles">從本機選擇</button>
+            <button type="button" class="solid-button upload-text-button" id="submitUploadQueue">開始上傳</button>
+          </div>
+        </section>
+      </div>
+
       <div class="sr-only" aria-live="polite">
         <span id="statusMessage"></span>
         <span id="currentFolderName"></span>

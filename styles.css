@@ -362,6 +362,159 @@ body::selection {
   opacity: 1;
 }
 
+.upload-modal-card {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 18px;
+}
+
+.upload-modal-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.upload-modal-title,
+.upload-modal-subtitle,
+.upload-queue-summary {
+  margin: 0;
+}
+
+.upload-modal-title {
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.upload-modal-subtitle,
+.upload-queue-summary {
+  color: var(--ink-soft);
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.upload-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 22px;
+  border: 1.5px dashed rgba(36, 83, 146, 0.28);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18)),
+    rgba(255, 255, 255, 0.32);
+  color: var(--ink);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform var(--ease-smooth),
+    border-color var(--ease-smooth),
+    background var(--ease-smooth),
+    box-shadow var(--ease-smooth);
+}
+
+.upload-dropzone:hover,
+.upload-dropzone:focus-visible,
+.upload-dropzone.drag-active {
+  transform: translateY(-2px);
+  border-color: rgba(36, 83, 146, 0.54);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.22)),
+    rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 40px rgba(18, 48, 94, 0.12);
+}
+
+.upload-dropzone:focus-visible {
+  outline: 2px solid rgba(15, 26, 43, 0.18);
+  outline-offset: 4px;
+}
+
+.upload-dropzone[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.7;
+  transform: none;
+}
+
+.upload-dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+.upload-dropzone strong,
+.upload-dropzone span {
+  font-family: "Noto Sans TC", sans-serif;
+}
+
+.upload-dropzone strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.upload-dropzone span {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.upload-queue {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-queue-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.upload-queue-chip {
+  border: 0;
+  max-width: 100%;
+  padding: 11px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  font: inherit;
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  transition:
+    transform var(--ease-smooth),
+    background var(--ease-smooth),
+    box-shadow var(--ease-smooth);
+}
+
+.upload-queue-chip:hover,
+.upload-queue-chip:focus-visible {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 24px rgba(18, 48, 94, 0.12);
+}
+
+.upload-modal-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.upload-text-button {
+  width: auto;
+  min-width: 112px;
+  padding: 0 18px;
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .image-viewer {
   position: fixed;
   inset: 0;
@@ -678,5 +831,23 @@ body::selection {
   .folder-input-shell {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .upload-modal-card {
+    padding: 20px;
+  }
+
+  .upload-dropzone {
+    padding: 22px 16px;
+  }
+
+  .upload-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .upload-text-button {
+    width: 100%;
+    min-width: 0;
   }
 }
