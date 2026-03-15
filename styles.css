@@ -78,10 +78,11 @@ body::selection {
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   height: 320px;
-  padding: 12px;
+  padding: 14px;
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.48);
   border-radius: 28px;
@@ -95,13 +96,36 @@ body::selection {
     border-color var(--ease-smooth);
 }
 
+.gallery-media {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
 .gallery-item img {
   display: block;
   width: auto;
   height: 100%;
   max-width: min(100%, calc(100vw - 140px));
+  max-height: 100%;
   border-radius: 20px;
   pointer-events: none;
+}
+
+.gallery-name {
+  display: block;
+  width: 100%;
+  padding-top: 12px;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gallery-item:hover {
@@ -365,6 +389,22 @@ body::selection {
   border-radius: 24px;
 }
 
+.image-viewer-name {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  right: 220px;
+  margin: 0;
+  overflow: hidden;
+  color: #f5f8ff;
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .image-viewer-toolbar {
   position: absolute;
   top: 18px;
@@ -564,6 +604,13 @@ body::selection {
   .image-viewer-shell {
     padding: 68px 12px 12px;
     border-radius: 24px;
+  }
+
+  .image-viewer-name {
+    top: 16px;
+    left: 16px;
+    right: 164px;
+    font-size: 0.9rem;
   }
 
   .image-viewer-toolbar {

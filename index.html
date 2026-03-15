@@ -99,6 +99,12 @@
     <div class="image-viewer" id="imageViewer" aria-hidden="true">
       <section class="image-viewer-shell" role="dialog" aria-modal="true" aria-label="圖片預覽">
         <div class="image-viewer-toolbar">
+          <button type="button" class="viewer-icon-button" id="renamePreview" aria-label="重新命名圖片">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <path d="M4 20h4l10-10-4-4L4 16v4" />
+              <path d="M13 7l4 4" />
+            </svg>
+          </button>
           <button type="button" class="viewer-icon-button" id="downloadPreview" aria-label="下載圖片">
             <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
               <path d="M12 4v10" />
@@ -120,6 +126,7 @@
           </button>
         </div>
 
+        <p class="image-viewer-name" id="previewName"></p>
         <img id="previewImage" alt="" />
       </section>
     </div>

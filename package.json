@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check lib/blob.js && node --check api/library.js && node --check api/folders.js && node --check api/upload.js",
+    "check": "node --check app.js && node --check lib/blob.js && node --check api/library.js && node --check api/folders.js && node --check api/images.js && node --check api/upload.js",
     "dev:vercel": "vercel dev"
   },
   "dependencies": {

@@ -14,7 +14,9 @@ const elements = {
   folderNameInput: document.querySelector("#folderNameInput"),
   submitFolderForm: document.querySelector("#submitFolderForm"),
   imageViewer: document.querySelector("#imageViewer"),
+  renamePreview: document.querySelector("#renamePreview"),
   previewImage: document.querySelector("#previewImage"),
+  previewName: document.querySelector("#previewName"),
   closePreview: document.querySelector("#closePreview"),
   downloadPreview: document.querySelector("#downloadPreview"),
   copyPreview: document.querySelector("#copyPreview"),
@@ -74,6 +76,7 @@ function bindEvents() {
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
+  elements.renamePreview?.addEventListener("click", handleRenamePreview);
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
   elements.copyPreview?.addEventListener("click", handleCopyPreview);
@@ -122,6 +125,8 @@ function openImageViewer(image) {
     elements.previewImage.alt = image.name || "";
   }
 
+  updateText(elements.previewName, image.name || "");
+
   elements.imageViewer?.classList.add("open");
   elements.imageViewer?.setAttribute("aria-hidden", "false");
   document.body.classList.add("viewer-open");
@@ -137,6 +142,8 @@ function closeImageViewer() {
     elements.previewImage.src = "";
     elements.previewImage.alt = "";
   }
+
+  updateText(elements.previewName, "");
 }
 
 async function handleCreateFolder(event) {
@@ -370,6 +377,10 @@ function renderGallery() {
     button.type = "button";
     button.className = "gallery-item";
     button.setAttribute("aria-label", image.name || "開啟圖片");
+    button.title = image.name || "";
+
+    const media = document.createElement("span");
+    media.className = "gallery-media";
 
     const img = document.createElement("img");
     img.src = image.thumbnailUrl || image.url;
@@ -377,8 +388,13 @@ function renderGallery() {
     img.loading = "lazy";
     img.decoding = "async";
 
+    const label = document.createElement("span");
+    label.className = "gallery-name";
+    label.textContent = image.name || "";
+
     button.addEventListener("click", () => openImageViewer(image));
-    button.append(img);
+    media.append(img);
+    button.append(media, label);
     elements.galleryGrid?.append(button);
   });
 
@@ -529,7 +545,7 @@ async function handleDownloadPreview() {
     const objectUrl = URL.createObjectURL(fileBlob);
     const link = document.createElement("a");
     link.href = objectUrl;
-    link.download = state.activePreview.name || "image";
+    link.download = getDownloadFileName(state.activePreview);
     document.body.append(link);
     link.click();
     link.remove();
@@ -577,6 +593,51 @@ async function handleCopyPreview() {
   }
 }
 
+async function handleRenamePreview() {
+  if (!state.activePreview) {
+    return;
+  }
+
+  const nextName = window.prompt("輸入圖片名稱", state.activePreview.name || "");
+  if (nextName === null) {
+    return;
+  }
+
+  const normalizedName = normalizeImageName(nextName);
+  if (!normalizedName) {
+    setStatus("圖片名稱不能是空的。", true);
+    return;
+  }
+
+  try {
+    setViewerBusy(true);
+
+    const response = await fetch("/api/images", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageId: state.activePreview.id,
+        name: normalizedName,
+      }),
+    });
+
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "重新命名失敗。");
+    }
+
+    applyRenamedImage(payload.image.id, payload.image.name);
+    setStatus(`圖片已重新命名為 ${payload.image.name}。`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "重新命名失敗。", true);
+  } finally {
+    setViewerBusy(false);
+  }
+}
+
 async function fetchPreviewBlob() {
   if (!state.activePreview) {
     throw new Error("目前沒有可用的圖片。");
@@ -594,6 +655,10 @@ async function fetchPreviewBlob() {
 }
 
 function setViewerBusy(isBusy) {
+  if (elements.renamePreview) {
+    elements.renamePreview.disabled = isBusy;
+  }
+
   if (elements.downloadPreview) {
     elements.downloadPreview.disabled = isBusy;
   }
@@ -601,6 +666,50 @@ function setViewerBusy(isBusy) {
   if (elements.copyPreview) {
     elements.copyPreview.disabled = isBusy;
   }
+}
+
+function applyRenamedImage(imageId, name) {
+  state.images = state.images.map((image) => (image.id === imageId ? { ...image, name } : image));
+
+  if (state.activePreview?.id === imageId) {
+    state.activePreview = {
+      ...state.activePreview,
+      name,
+    };
+
+    if (elements.previewImage) {
+      elements.previewImage.alt = name;
+    }
+
+    updateText(elements.previewName, name);
+  }
+
+  saveLibraryCache();
+  render();
+}
+
+function getDownloadFileName(image) {
+  const baseName = normalizeImageName(image.name || "") || "image";
+  const extension = getFileExtension(image.originalName || "");
+
+  if (!extension || baseName.toLowerCase().endsWith(extension.toLowerCase())) {
+    return baseName;
+  }
+
+  return `${baseName}${extension}`;
+}
+
+function getFileExtension(fileName) {
+  const lastDotIndex = fileName.lastIndexOf(".");
+  if (lastDotIndex <= 0) {
+    return "";
+  }
+
+  return fileName.slice(lastDotIndex);
+}
+
+function normalizeImageName(name) {
+  return name.trim().replace(/\s+/g, " ");
 }
 
 function getFolderIconMarkup() {
