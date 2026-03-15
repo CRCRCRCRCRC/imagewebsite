@@ -130,6 +130,13 @@
     <div class="image-viewer" id="imageViewer" aria-hidden="true">
       <section class="image-viewer-shell" role="dialog" aria-modal="true" aria-label="圖片預覽">
         <div class="image-viewer-toolbar">
+          <button type="button" class="viewer-icon-button" id="editPreview" aria-label="編輯圖片">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <path d="M4 20h4l10-10-4-4L4 16v4" />
+              <path d="M13 7l4 4" />
+              <path d="M15 4l5 5" />
+            </svg>
+          </button>
           <button type="button" class="viewer-icon-button" id="renamePreview" aria-label="重新命名圖片">
             <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
               <path d="M4 20h4l10-10-4-4L4 16v4" />
@@ -159,6 +166,39 @@
 
         <p class="image-viewer-name" id="previewName"></p>
         <img id="previewImage" alt="" />
+      </section>
+    </div>
+
+    <div class="image-editor" id="imageEditor" aria-hidden="true">
+      <section class="image-editor-shell" role="dialog" aria-modal="true" aria-label="編輯圖片">
+        <div class="image-editor-toolbar">
+          <div class="image-editor-tools">
+            <button type="button" class="editor-tool active" id="editorCropTool">裁切</button>
+            <button type="button" class="editor-tool" id="editorDrawTool">畫筆</button>
+            <button type="button" class="editor-tool" id="applyCropTool">套用裁切</button>
+            <button type="button" class="editor-tool" id="resetEditor">重設</button>
+          </div>
+
+          <div class="image-editor-controls">
+            <label class="editor-control">
+              <span>顏色</span>
+              <input type="color" id="editorColor" value="#0f1a2b" />
+            </label>
+            <label class="editor-control editor-control-range">
+              <span>筆刷</span>
+              <input type="range" id="editorBrushSize" min="2" max="32" value="8" />
+            </label>
+          </div>
+
+          <div class="image-editor-actions">
+            <button type="button" class="ghost-button upload-text-button" id="closeEditor">取消</button>
+            <button type="button" class="solid-button upload-text-button" id="saveEditor">儲存</button>
+          </div>
+        </div>
+
+        <div class="image-editor-stage" id="editorStage">
+          <canvas id="editorCanvas" tabindex="0"></canvas>
+        </div>
       </section>
     </div>
 

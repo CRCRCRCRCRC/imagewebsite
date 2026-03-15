@@ -1,4 +1,4 @@
-import { renameImage } from "../lib/blob.js";
+import { renameImage, replaceImage } from "../lib/blob.js";
 
 export async function PATCH(request) {
   try {
@@ -7,7 +7,7 @@ export async function PATCH(request) {
     const name = String(body?.name || "").trim();
 
     if (!imageId) {
-      return json({ error: "缺少圖片識別資料。" }, 400);
+      return json({ error: "缺少圖片 ID。" }, 400);
     }
 
     if (!name) {
@@ -18,12 +18,29 @@ export async function PATCH(request) {
     return json({ image });
   } catch (error) {
     console.error(error);
-    return json(
-      {
-        error: error.message || "重新命名失敗。",
-      },
-      400,
-    );
+    return json({ error: error.message || "重新命名失敗。" }, 400);
+  }
+}
+
+export async function PUT(request) {
+  try {
+    const formData = await request.formData();
+    const imageId = String(formData.get("imageId") || "").trim();
+    const file = formData.get("file");
+
+    if (!imageId) {
+      return json({ error: "缺少圖片 ID。" }, 400);
+    }
+
+    if (!(file instanceof File)) {
+      return json({ error: "缺少編輯後的圖片檔案。" }, 400);
+    }
+
+    const image = await replaceImage(imageId, file);
+    return json({ image });
+  } catch (error) {
+    console.error(error);
+    return json({ error: error.message || "更新圖片失敗。" }, 400);
   }
 }
 

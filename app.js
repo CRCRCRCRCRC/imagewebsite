@@ -1,4 +1,6 @@
 const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
+const EDITOR_DEFAULT_COLOR = "#0f1a2b";
+const EDITOR_DEFAULT_BRUSH = 8;
 const ROOT_FOLDER_NAME = "我的圖片";
 const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
 const LIBRARY_CACHE_KEY = "image-space-library";
@@ -20,6 +22,18 @@ const elements = {
   folderNameInput: document.querySelector("#folderNameInput"),
   submitFolderForm: document.querySelector("#submitFolderForm"),
   imageViewer: document.querySelector("#imageViewer"),
+  imageEditor: document.querySelector("#imageEditor"),
+  editorStage: document.querySelector("#editorStage"),
+  editorCanvas: document.querySelector("#editorCanvas"),
+  editPreview: document.querySelector("#editPreview"),
+  editorCropTool: document.querySelector("#editorCropTool"),
+  editorDrawTool: document.querySelector("#editorDrawTool"),
+  applyCropTool: document.querySelector("#applyCropTool"),
+  resetEditor: document.querySelector("#resetEditor"),
+  editorColor: document.querySelector("#editorColor"),
+  editorBrushSize: document.querySelector("#editorBrushSize"),
+  closeEditor: document.querySelector("#closeEditor"),
+  saveEditor: document.querySelector("#saveEditor"),
   renamePreview: document.querySelector("#renamePreview"),
   previewImage: document.querySelector("#previewImage"),
   previewName: document.querySelector("#previewName"),
@@ -44,6 +58,7 @@ const state = {
   isBusy: false,
   activePreview: null,
   uploadQueue: [],
+  editor: createEditorState(),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -105,9 +120,23 @@ function bindEvents() {
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
 elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
+  elements.editPreview?.addEventListener("click", openImageEditor);
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
   elements.copyPreview?.addEventListener("click", handleCopyPreview);
+  elements.editorCropTool?.addEventListener("click", () => setEditorTool("crop"));
+  elements.editorDrawTool?.addEventListener("click", () => setEditorTool("draw"));
+  elements.applyCropTool?.addEventListener("click", applyEditorCrop);
+  elements.resetEditor?.addEventListener("click", resetImageEditor);
+  elements.closeEditor?.addEventListener("click", closeImageEditor);
+  elements.saveEditor?.addEventListener("click", saveImageEditor);
+  elements.editorColor?.addEventListener("input", handleEditorColorChange);
+  elements.editorBrushSize?.addEventListener("input", handleEditorBrushSizeChange);
+  elements.editorCanvas?.addEventListener("pointerdown", handleEditorPointerDown);
+  elements.editorCanvas?.addEventListener("pointermove", handleEditorPointerMove);
+  elements.editorCanvas?.addEventListener("pointerup", handleEditorPointerUp);
+  elements.editorCanvas?.addEventListener("pointerleave", handleEditorPointerUp);
+  elements.editorCanvas?.addEventListener("pointercancel", handleEditorPointerUp);
 
   elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
@@ -127,9 +156,21 @@ elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
     }
   });
 
+  elements.imageEditor?.addEventListener("click", (event) => {
+    if (event.target === elements.imageEditor) {
+      closeImageEditor();
+    }
+  });
+
   document.addEventListener("paste", handleUploadPaste);
+  window.addEventListener("resize", handleEditorViewportChange);
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isImageEditorOpen()) {
+      closeImageEditor();
+      return;
+    }
+
     if (event.key === "Escape" && isImageViewerOpen()) {
       closeImageViewer();
       return;
@@ -188,6 +229,22 @@ function isUploadModalOpen() {
   return elements.uploadModal?.classList.contains("open");
 }
 
+function createEditorState() {
+  return {
+    sourceImage: null,
+    workingCanvas: null,
+    workingContext: null,
+    tool: "crop",
+    color: EDITOR_DEFAULT_COLOR,
+    brushSize: EDITOR_DEFAULT_BRUSH,
+    cropStart: null,
+    cropRect: null,
+    isPointerDown: false,
+    lastPoint: null,
+    isSaving: false,
+  };
+}
+
 function openImageViewer(image) {
   state.activePreview = image;
 
@@ -215,6 +272,529 @@ function closeImageViewer() {
   }
 
   updateText(elements.previewName, "");
+}
+
+function isImageEditorOpen() {
+  return elements.imageEditor?.classList.contains("open");
+}
+
+async function openImageEditor() {
+  if (!state.activePreview || state.isBusy) {
+    return;
+  }
+
+  try {
+    setEditorBusy(true);
+    const image = await loadImageElement(appendCacheBust(state.activePreview.url, Date.now()));
+    prepareImageEditor(image);
+    syncEditorControls();
+    elements.imageEditor?.classList.add("open");
+    elements.imageEditor?.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(() => {
+      renderImageEditor();
+      elements.editorCanvas?.focus();
+    });
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "打開編輯器失敗。", true);
+  } finally {
+    setEditorBusy(false);
+  }
+}
+
+function closeImageEditor({ force = false } = {}) {
+  if (state.editor.isSaving && !force) {
+    return;
+  }
+
+  elements.imageEditor?.classList.remove("open");
+  elements.imageEditor?.setAttribute("aria-hidden", "true");
+  state.editor = createEditorState();
+  syncEditorControls();
+
+  if (elements.editorCanvas) {
+    const context = elements.editorCanvas.getContext("2d");
+    context?.clearRect(0, 0, elements.editorCanvas.width, elements.editorCanvas.height);
+    elements.editorCanvas.width = 0;
+    elements.editorCanvas.height = 0;
+  }
+}
+
+function prepareImageEditor(image) {
+  const workingCanvas = document.createElement("canvas");
+  workingCanvas.width = image.naturalWidth;
+  workingCanvas.height = image.naturalHeight;
+
+  const workingContext = workingCanvas.getContext("2d");
+  if (!workingContext) {
+    throw new Error("編輯器初始化失敗。");
+  }
+
+  workingContext.drawImage(image, 0, 0);
+  state.editor = {
+    ...createEditorState(),
+    sourceImage: image,
+    workingCanvas,
+    workingContext,
+  };
+}
+
+function syncEditorControls() {
+  elements.editorCropTool?.classList.toggle("active", state.editor.tool === "crop");
+  elements.editorDrawTool?.classList.toggle("active", state.editor.tool === "draw");
+
+  if (elements.editorColor) {
+    elements.editorColor.value = state.editor.color;
+  }
+
+  if (elements.editorBrushSize) {
+    elements.editorBrushSize.value = String(state.editor.brushSize);
+  }
+
+  if (elements.applyCropTool) {
+    elements.applyCropTool.disabled = !state.editor.cropRect || state.editor.isSaving;
+  }
+}
+
+function setEditorTool(tool) {
+  state.editor.tool = tool;
+  state.editor.isPointerDown = false;
+  state.editor.lastPoint = null;
+  syncEditorControls();
+  renderImageEditor();
+}
+
+function resetImageEditor() {
+  if (!state.editor.sourceImage || state.editor.isSaving) {
+    return;
+  }
+
+  prepareImageEditor(state.editor.sourceImage);
+  syncEditorControls();
+  renderImageEditor();
+  setStatus("已重設圖片編輯。");
+}
+
+function handleEditorColorChange(event) {
+  state.editor.color = event.target.value || EDITOR_DEFAULT_COLOR;
+}
+
+function handleEditorBrushSizeChange(event) {
+  const nextSize = Number(event.target.value);
+  state.editor.brushSize = Number.isFinite(nextSize) ? nextSize : EDITOR_DEFAULT_BRUSH;
+}
+
+function handleEditorViewportChange() {
+  if (!isImageEditorOpen()) {
+    return;
+  }
+
+  renderImageEditor();
+}
+
+function renderImageEditor() {
+  if (!elements.editorCanvas || !elements.editorStage || !state.editor.workingCanvas) {
+    return;
+  }
+
+  const { workingCanvas, cropRect } = state.editor;
+  const availableWidth = Math.max(elements.editorStage.clientWidth - 16, 1);
+  const availableHeight = Math.max(elements.editorStage.clientHeight - 16, 1);
+  const scale = Math.min(
+    availableWidth / workingCanvas.width,
+    availableHeight / workingCanvas.height,
+    1,
+  );
+  const displayWidth = Math.max(1, Math.round(workingCanvas.width * scale));
+  const displayHeight = Math.max(1, Math.round(workingCanvas.height * scale));
+
+  elements.editorCanvas.width = displayWidth;
+  elements.editorCanvas.height = displayHeight;
+  elements.editorCanvas.style.width = `${displayWidth}px`;
+  elements.editorCanvas.style.height = `${displayHeight}px`;
+
+  const context = elements.editorCanvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  context.clearRect(0, 0, displayWidth, displayHeight);
+  context.drawImage(workingCanvas, 0, 0, displayWidth, displayHeight);
+
+  if (cropRect && state.editor.tool === "crop") {
+    const normalizedRect = normalizeCropRect(cropRect);
+    const scaleX = displayWidth / workingCanvas.width;
+    const scaleY = displayHeight / workingCanvas.height;
+    const left = normalizedRect.x * scaleX;
+    const top = normalizedRect.y * scaleY;
+    const width = normalizedRect.width * scaleX;
+    const height = normalizedRect.height * scaleY;
+
+    context.save();
+    context.fillStyle = "rgba(8, 17, 31, 0.42)";
+    context.fillRect(0, 0, displayWidth, displayHeight);
+    context.clearRect(left, top, width, height);
+    context.strokeStyle = "#f5f8ff";
+    context.lineWidth = 2;
+    context.setLineDash([10, 8]);
+    context.strokeRect(left, top, width, height);
+    context.restore();
+  }
+}
+
+function handleEditorPointerDown(event) {
+  if (!state.editor.workingCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  if (event.pointerType === "mouse" && event.button !== 0) {
+    return;
+  }
+
+  const point = getEditorCanvasPoint(event);
+  if (!point) {
+    return;
+  }
+
+  state.editor.isPointerDown = true;
+  elements.editorCanvas?.setPointerCapture?.(event.pointerId);
+
+  if (state.editor.tool === "draw") {
+    state.editor.lastPoint = point;
+    drawEditorStroke(point, point);
+    renderImageEditor();
+    return;
+  }
+
+  state.editor.cropStart = point;
+  state.editor.cropRect = {
+    x: point.x,
+    y: point.y,
+    width: 0,
+    height: 0,
+  };
+  syncEditorControls();
+  renderImageEditor();
+}
+
+function handleEditorPointerMove(event) {
+  if (!state.editor.isPointerDown || !state.editor.workingCanvas) {
+    return;
+  }
+
+  const point = getEditorCanvasPoint(event);
+  if (!point) {
+    return;
+  }
+
+  if (state.editor.tool === "draw") {
+    if (state.editor.lastPoint) {
+      drawEditorStroke(state.editor.lastPoint, point);
+    }
+
+    state.editor.lastPoint = point;
+    renderImageEditor();
+    return;
+  }
+
+  if (!state.editor.cropStart) {
+    return;
+  }
+
+  state.editor.cropRect = {
+    x: state.editor.cropStart.x,
+    y: state.editor.cropStart.y,
+    width: point.x - state.editor.cropStart.x,
+    height: point.y - state.editor.cropStart.y,
+  };
+  syncEditorControls();
+  renderImageEditor();
+}
+
+function handleEditorPointerUp(event) {
+  if (!state.editor.isPointerDown) {
+    return;
+  }
+
+  if (elements.editorCanvas?.hasPointerCapture?.(event.pointerId)) {
+    elements.editorCanvas.releasePointerCapture(event.pointerId);
+  }
+
+  state.editor.isPointerDown = false;
+  state.editor.lastPoint = null;
+  state.editor.cropStart = null;
+
+  if (state.editor.cropRect) {
+    const normalizedRect = normalizeCropRect(state.editor.cropRect);
+    if (normalizedRect.width < 8 || normalizedRect.height < 8) {
+      state.editor.cropRect = null;
+    }
+  }
+
+  syncEditorControls();
+  renderImageEditor();
+}
+
+function drawEditorStroke(from, to) {
+  if (!state.editor.workingContext) {
+    return;
+  }
+
+  state.editor.workingContext.save();
+  state.editor.workingContext.strokeStyle = state.editor.color;
+  state.editor.workingContext.lineWidth = state.editor.brushSize;
+  state.editor.workingContext.lineCap = "round";
+  state.editor.workingContext.lineJoin = "round";
+  state.editor.workingContext.beginPath();
+  state.editor.workingContext.moveTo(from.x, from.y);
+  state.editor.workingContext.lineTo(to.x, to.y);
+  state.editor.workingContext.stroke();
+  state.editor.workingContext.restore();
+}
+
+function applyEditorCrop() {
+  if (!state.editor.workingCanvas || !state.editor.cropRect || state.editor.isSaving) {
+    return;
+  }
+
+  const rect = normalizeCropRect(state.editor.cropRect);
+  if (rect.width < 8 || rect.height < 8) {
+    setStatus("裁切範圍太小。", true);
+    return;
+  }
+
+  const nextCanvas = document.createElement("canvas");
+  nextCanvas.width = rect.width;
+  nextCanvas.height = rect.height;
+  const nextContext = nextCanvas.getContext("2d");
+  if (!nextContext) {
+    setStatus("裁切失敗。", true);
+    return;
+  }
+
+  nextContext.drawImage(
+    state.editor.workingCanvas,
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+    0,
+    0,
+    rect.width,
+    rect.height,
+  );
+
+  state.editor.workingCanvas = nextCanvas;
+  state.editor.workingContext = nextContext;
+  state.editor.cropRect = null;
+  syncEditorControls();
+  renderImageEditor();
+  setStatus("已套用裁切。");
+}
+
+function getEditorCanvasPoint(event) {
+  if (!elements.editorCanvas || !state.editor.workingCanvas) {
+    return null;
+  }
+
+  const rect = elements.editorCanvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return null;
+  }
+
+  const x = ((event.clientX - rect.left) / rect.width) * state.editor.workingCanvas.width;
+  const y = ((event.clientY - rect.top) / rect.height) * state.editor.workingCanvas.height;
+
+  return {
+    x: clamp(x, 0, state.editor.workingCanvas.width),
+    y: clamp(y, 0, state.editor.workingCanvas.height),
+  };
+}
+
+function normalizeCropRect(rect) {
+  return {
+    x: Math.round(Math.min(rect.x, rect.x + rect.width)),
+    y: Math.round(Math.min(rect.y, rect.y + rect.height)),
+    width: Math.round(Math.abs(rect.width)),
+    height: Math.round(Math.abs(rect.height)),
+  };
+}
+
+async function saveImageEditor() {
+  if (!state.activePreview || !state.editor.workingCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  try {
+    state.editor.isSaving = true;
+    setEditorBusy(true);
+
+    const mimeType = getEditorOutputType(state.activePreview.originalName);
+    const editedBlob = await canvasToBlob(state.editor.workingCanvas, mimeType);
+    const editedFile = new File([editedBlob], state.activePreview.originalName || "image.png", {
+      type: editedBlob.type || mimeType,
+    });
+
+    const formData = new FormData();
+    formData.set("imageId", state.activePreview.id);
+    formData.set("file", editedFile);
+
+    const response = await fetch("/api/images", {
+      method: "PUT",
+      body: formData,
+    });
+
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "儲存圖片失敗。");
+    }
+
+    applyEditedImage(payload.image);
+    closeImageEditor({ force: true });
+    setStatus("圖片已更新。");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "儲存圖片失敗。", true);
+  } finally {
+    state.editor.isSaving = false;
+    setEditorBusy(false);
+  }
+}
+
+function applyEditedImage(image) {
+  if (!image?.id) {
+    return;
+  }
+
+  const version = image.updatedAt || Date.now();
+  const nextUrl = appendCacheBust(image.url, version);
+  const nextThumbnailUrl = appendCacheBust(image.thumbnailUrl || image.url, version);
+
+  state.images = state.images.map((entry) =>
+    entry.id === image.id
+      ? {
+          ...entry,
+          url: nextUrl,
+          thumbnailUrl: nextThumbnailUrl,
+          uploadedAt: image.uploadedAt || entry.uploadedAt,
+        }
+      : entry,
+  );
+
+  if (state.activePreview?.id === image.id) {
+    state.activePreview = {
+      ...state.activePreview,
+      url: nextUrl,
+      thumbnailUrl: nextThumbnailUrl,
+      uploadedAt: image.uploadedAt || state.activePreview.uploadedAt,
+    };
+
+    if (elements.previewImage) {
+      elements.previewImage.src = nextUrl;
+    }
+  }
+
+  saveLibraryCache();
+  render();
+}
+
+function setEditorBusy(isBusy) {
+  if (elements.editPreview) {
+    elements.editPreview.disabled = isBusy;
+  }
+
+  if (elements.editorCropTool) {
+    elements.editorCropTool.disabled = isBusy;
+  }
+
+  if (elements.editorDrawTool) {
+    elements.editorDrawTool.disabled = isBusy;
+  }
+
+  if (elements.applyCropTool) {
+    elements.applyCropTool.disabled = isBusy || !state.editor.cropRect;
+  }
+
+  if (elements.resetEditor) {
+    elements.resetEditor.disabled = isBusy;
+  }
+
+  if (elements.editorColor) {
+    elements.editorColor.disabled = isBusy;
+  }
+
+  if (elements.editorBrushSize) {
+    elements.editorBrushSize.disabled = isBusy;
+  }
+
+  if (elements.closeEditor) {
+    elements.closeEditor.disabled = isBusy;
+  }
+
+  if (elements.saveEditor) {
+    elements.saveEditor.disabled = isBusy;
+  }
+}
+
+async function loadImageElement(src) {
+  const image = new Image();
+  image.decoding = "async";
+
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error("載入圖片失敗。"));
+    image.src = src;
+  });
+
+  return image;
+}
+
+function canvasToBlob(canvas, mimeType) {
+  const quality = mimeType === "image/jpeg" ? 0.92 : undefined;
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("圖片輸出失敗。"));
+        return;
+      }
+
+      resolve(blob);
+    }, mimeType, quality);
+  });
+}
+
+function getEditorOutputType(fileName) {
+  const extension = getFileExtension(fileName || "").toLowerCase();
+
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+
+  return "image/png";
+}
+
+function appendCacheBust(url, value) {
+  if (!url) {
+    return url;
+  }
+
+  try {
+    const nextUrl = new URL(url);
+    nextUrl.searchParams.set("v", String(value));
+    return nextUrl.toString();
+  } catch (error) {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}v=${value}`;
+  }
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 async function handleCreateFolder(event) {
@@ -1063,6 +1643,10 @@ async function fetchPreviewBlob() {
 }
 
 function setViewerBusy(isBusy) {
+  if (elements.editPreview) {
+    elements.editPreview.disabled = isBusy;
+  }
+
   if (elements.renamePreview) {
     elements.renamePreview.disabled = isBusy;
   }
