@@ -80,7 +80,7 @@ body::selection {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  height: 260px;
+  height: 320px;
   padding: 12px;
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.48);
@@ -547,13 +547,13 @@ body::selection {
   }
 
   .gallery-item {
-    height: 220px;
+    height: 270px;
   }
 }
 
 @media (max-width: 640px) {
   .gallery-item {
-    height: 190px;
+    height: 230px;
     max-width: 100%;
   }
 
