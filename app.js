@@ -1,6 +1,8 @@
 const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
 const EDITOR_DEFAULT_COLOR = "#0f1a2b";
 const EDITOR_DEFAULT_BRUSH = 8;
+const EDITOR_HISTORY_LIMIT = 12;
+const EDITOR_MAX_EDGE = 2400;
 const ROOT_FOLDER_NAME = "我的圖片";
 const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
 const LIBRARY_CACHE_KEY = "image-space-library";
@@ -25,10 +27,16 @@ const elements = {
   imageEditor: document.querySelector("#imageEditor"),
   editorStage: document.querySelector("#editorStage"),
   editorCanvas: document.querySelector("#editorCanvas"),
+  editorHint: document.querySelector("#editorHint"),
   editPreview: document.querySelector("#editPreview"),
   editorCropTool: document.querySelector("#editorCropTool"),
   editorDrawTool: document.querySelector("#editorDrawTool"),
+  editorEraserTool: document.querySelector("#editorEraserTool"),
   applyCropTool: document.querySelector("#applyCropTool"),
+  editorUndo: document.querySelector("#editorUndo"),
+  editorRedo: document.querySelector("#editorRedo"),
+  editorRotateLeft: document.querySelector("#editorRotateLeft"),
+  editorRotateRight: document.querySelector("#editorRotateRight"),
   resetEditor: document.querySelector("#resetEditor"),
   editorColor: document.querySelector("#editorColor"),
   editorBrushSize: document.querySelector("#editorBrushSize"),
@@ -58,7 +66,7 @@ const state = {
   isBusy: false,
   activePreview: null,
   uploadQueue: [],
-  editor: createEditorState(),
+  editor: createEditorStateV2(),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -119,24 +127,29 @@ function bindEvents() {
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
-elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
-  elements.editPreview?.addEventListener("click", openImageEditor);
+  elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
+  elements.editPreview?.addEventListener("click", openImageEditorV2);
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
   elements.copyPreview?.addEventListener("click", handleCopyPreview);
-  elements.editorCropTool?.addEventListener("click", () => setEditorTool("crop"));
-  elements.editorDrawTool?.addEventListener("click", () => setEditorTool("draw"));
-  elements.applyCropTool?.addEventListener("click", applyEditorCrop);
-  elements.resetEditor?.addEventListener("click", resetImageEditor);
-  elements.closeEditor?.addEventListener("click", closeImageEditor);
-  elements.saveEditor?.addEventListener("click", saveImageEditor);
+  elements.editorCropTool?.addEventListener("click", () => setEditorToolV2("crop"));
+  elements.editorDrawTool?.addEventListener("click", () => setEditorToolV2("draw"));
+  elements.editorEraserTool?.addEventListener("click", () => setEditorToolV2("erase"));
+  elements.applyCropTool?.addEventListener("click", applyEditorCropV2);
+  elements.editorUndo?.addEventListener("click", undoImageEditorV2);
+  elements.editorRedo?.addEventListener("click", redoImageEditorV2);
+  elements.editorRotateLeft?.addEventListener("click", () => rotateImageEditorV2(-1));
+  elements.editorRotateRight?.addEventListener("click", () => rotateImageEditorV2(1));
+  elements.resetEditor?.addEventListener("click", resetImageEditorV2);
+  elements.closeEditor?.addEventListener("click", closeImageEditorV2);
+  elements.saveEditor?.addEventListener("click", saveImageEditorV2);
   elements.editorColor?.addEventListener("input", handleEditorColorChange);
   elements.editorBrushSize?.addEventListener("input", handleEditorBrushSizeChange);
-  elements.editorCanvas?.addEventListener("pointerdown", handleEditorPointerDown);
-  elements.editorCanvas?.addEventListener("pointermove", handleEditorPointerMove);
-  elements.editorCanvas?.addEventListener("pointerup", handleEditorPointerUp);
-  elements.editorCanvas?.addEventListener("pointerleave", handleEditorPointerUp);
-  elements.editorCanvas?.addEventListener("pointercancel", handleEditorPointerUp);
+  elements.editorCanvas?.addEventListener("pointerdown", handleEditorPointerDownV2);
+  elements.editorCanvas?.addEventListener("pointermove", handleEditorPointerMoveV2);
+  elements.editorCanvas?.addEventListener("pointerup", handleEditorPointerUpV2);
+  elements.editorCanvas?.addEventListener("pointerleave", handleEditorPointerUpV2);
+  elements.editorCanvas?.addEventListener("pointercancel", handleEditorPointerUpV2);
 
   elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
@@ -158,16 +171,16 @@ elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
 
   elements.imageEditor?.addEventListener("click", (event) => {
     if (event.target === elements.imageEditor) {
-      closeImageEditor();
+      closeImageEditorV2();
     }
   });
 
   document.addEventListener("paste", handleUploadPaste);
-  window.addEventListener("resize", handleEditorViewportChange);
+  window.addEventListener("resize", handleEditorViewportChangeV2);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isImageEditorOpen()) {
-      closeImageEditor();
+      closeImageEditorV2();
       return;
     }
 
@@ -284,10 +297,10 @@ async function openImageEditor() {
   }
 
   try {
-    setEditorBusy(true);
+    setEditorBusyV2(true);
     const image = await loadImageElement(appendCacheBust(state.activePreview.url, Date.now()));
-    prepareImageEditor(image);
-    syncEditorControls();
+    prepareImageEditorV2(image);
+    syncEditorControlsV2();
     elements.imageEditor?.classList.add("open");
     elements.imageEditor?.setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => {
@@ -298,7 +311,7 @@ async function openImageEditor() {
     console.error(error);
     setStatus(error.message || "打開編輯器失敗。", true);
   } finally {
-    setEditorBusy(false);
+    setEditorBusyV2(false);
   }
 }
 
@@ -309,8 +322,8 @@ function closeImageEditor({ force = false } = {}) {
 
   elements.imageEditor?.classList.remove("open");
   elements.imageEditor?.setAttribute("aria-hidden", "true");
-  state.editor = createEditorState();
-  syncEditorControls();
+  state.editor = createEditorStateV2();
+  syncEditorControlsV2();
 
   if (elements.editorCanvas) {
     const context = elements.editorCanvas.getContext("2d");
@@ -1721,4 +1734,598 @@ function getHomeIconMarkup() {
       <path d="M51 91V63h18v28" />
     </svg>
   `;
+}
+
+function createEditorStateV2() {
+  return {
+    sourceCanvas: null,
+    workingCanvas: null,
+    workingContext: null,
+    tool: "crop",
+    color: EDITOR_DEFAULT_COLOR,
+    brushSize: EDITOR_DEFAULT_BRUSH,
+    cropStart: null,
+    cropRect: null,
+    isPointerDown: false,
+    lastPoint: null,
+    strokeDirty: false,
+    history: [],
+    historyIndex: -1,
+    renderFrame: 0,
+    isSaving: false,
+  };
+}
+
+async function openImageEditorV2() {
+  if (!state.activePreview || state.isBusy) {
+    return;
+  }
+
+  try {
+    setEditorBusyV2(true);
+    const image = await loadImageElement(appendCacheBust(state.activePreview.url, Date.now()));
+    prepareImageEditorV2(image);
+    syncEditorControlsV2();
+    elements.imageEditor?.classList.add("open");
+    elements.imageEditor?.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(() => {
+      scheduleRenderImageEditorV2();
+      elements.editorCanvas?.focus();
+    });
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "開啟編輯器失敗。", true);
+  } finally {
+    setEditorBusyV2(false);
+  }
+}
+
+function closeImageEditorV2({ force = false } = {}) {
+  if (state.editor.isSaving && !force) {
+    return;
+  }
+
+  if (state.editor.renderFrame) {
+    cancelAnimationFrame(state.editor.renderFrame);
+  }
+
+  elements.imageEditor?.classList.remove("open");
+  elements.imageEditor?.setAttribute("aria-hidden", "true");
+  state.editor = createEditorStateV2();
+  syncEditorControlsV2();
+
+  if (elements.editorCanvas) {
+    const context = elements.editorCanvas.getContext("2d");
+    context?.clearRect(0, 0, elements.editorCanvas.width, elements.editorCanvas.height);
+    elements.editorCanvas.width = 0;
+    elements.editorCanvas.height = 0;
+  }
+}
+
+function prepareImageEditorV2(image) {
+  const sourceCanvas = createScaledEditorCanvasV2(image);
+  if (!sourceCanvas) {
+    throw new Error("編輯器初始化失敗。");
+  }
+
+  state.editor = {
+    ...createEditorStateV2(),
+    sourceCanvas,
+  };
+
+  setEditorWorkingCanvasV2(cloneEditorCanvasV2(sourceCanvas), { pushHistory: true });
+}
+
+function syncEditorControlsV2() {
+  elements.editorCropTool?.classList.toggle("active", state.editor.tool === "crop");
+  elements.editorDrawTool?.classList.toggle("active", state.editor.tool === "draw");
+  elements.editorEraserTool?.classList.toggle("active", state.editor.tool === "erase");
+
+  if (elements.editorColor) {
+    elements.editorColor.value = state.editor.color;
+  }
+
+  if (elements.editorBrushSize) {
+    elements.editorBrushSize.value = String(state.editor.brushSize);
+  }
+
+  if (elements.applyCropTool) {
+    elements.applyCropTool.disabled = state.editor.isSaving || !state.editor.cropRect;
+  }
+
+  if (elements.editorUndo) {
+    elements.editorUndo.disabled = state.editor.isSaving || state.editor.historyIndex <= 0;
+  }
+
+  if (elements.editorRedo) {
+    elements.editorRedo.disabled =
+      state.editor.isSaving || state.editor.historyIndex >= state.editor.history.length - 1;
+  }
+
+  if (elements.editorHint) {
+    elements.editorHint.textContent = getEditorHintTextV2();
+  }
+}
+
+function setEditorToolV2(tool) {
+  state.editor.tool = tool;
+  state.editor.isPointerDown = false;
+  state.editor.lastPoint = null;
+  state.editor.cropStart = null;
+
+  if (tool !== "crop") {
+    state.editor.cropRect = null;
+  }
+
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function resetImageEditorV2() {
+  if (!state.editor.sourceCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  state.editor.cropRect = null;
+  setEditorWorkingCanvasV2(cloneEditorCanvasV2(state.editor.sourceCanvas), { pushHistory: true });
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+  setStatus("已重設編輯內容。");
+}
+
+function handleEditorViewportChangeV2() {
+  if (!isImageEditorOpen()) {
+    return;
+  }
+
+  scheduleRenderImageEditorV2();
+}
+
+function renderImageEditorV2() {
+  if (!elements.editorCanvas || !elements.editorStage || !state.editor.workingCanvas) {
+    return;
+  }
+
+  const { workingCanvas, cropRect } = state.editor;
+  const availableWidth = Math.max(elements.editorStage.clientWidth - 24, 1);
+  const availableHeight = Math.max(elements.editorStage.clientHeight - 24, 1);
+  const scale = Math.min(
+    availableWidth / workingCanvas.width,
+    availableHeight / workingCanvas.height,
+    1,
+  );
+  const displayWidth = Math.max(1, Math.round(workingCanvas.width * scale));
+  const displayHeight = Math.max(1, Math.round(workingCanvas.height * scale));
+
+  elements.editorCanvas.width = displayWidth;
+  elements.editorCanvas.height = displayHeight;
+  elements.editorCanvas.style.width = `${displayWidth}px`;
+  elements.editorCanvas.style.height = `${displayHeight}px`;
+
+  const context = elements.editorCanvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "medium";
+  context.clearRect(0, 0, displayWidth, displayHeight);
+  context.drawImage(workingCanvas, 0, 0, displayWidth, displayHeight);
+
+  if (cropRect && state.editor.tool === "crop") {
+    const normalizedRect = normalizeCropRect(cropRect);
+    const scaleX = displayWidth / workingCanvas.width;
+    const scaleY = displayHeight / workingCanvas.height;
+    const left = normalizedRect.x * scaleX;
+    const top = normalizedRect.y * scaleY;
+    const width = normalizedRect.width * scaleX;
+    const height = normalizedRect.height * scaleY;
+
+    context.save();
+    context.fillStyle = "rgba(11, 18, 32, 0.46)";
+    context.fillRect(0, 0, displayWidth, displayHeight);
+    context.clearRect(left, top, width, height);
+    context.strokeStyle = "#f5f8ff";
+    context.lineWidth = 2;
+    context.setLineDash([10, 8]);
+    context.strokeRect(left, top, width, height);
+    context.restore();
+  }
+}
+
+function scheduleRenderImageEditorV2() {
+  if (!isImageEditorOpen() || state.editor.renderFrame) {
+    return;
+  }
+
+  state.editor.renderFrame = requestAnimationFrame(() => {
+    state.editor.renderFrame = 0;
+    renderImageEditorV2();
+  });
+}
+
+function handleEditorPointerDownV2(event) {
+  if (!state.editor.workingCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  if (event.pointerType === "mouse" && event.button !== 0) {
+    return;
+  }
+
+  const point = getEditorCanvasPoint(event);
+  if (!point) {
+    return;
+  }
+
+  state.editor.isPointerDown = true;
+  elements.editorCanvas?.setPointerCapture?.(event.pointerId);
+
+  if (state.editor.tool === "draw" || state.editor.tool === "erase") {
+    state.editor.lastPoint = point;
+    state.editor.strokeDirty = true;
+    drawEditorStrokeV2(point, point);
+    scheduleRenderImageEditorV2();
+    return;
+  }
+
+  state.editor.cropStart = point;
+  state.editor.cropRect = {
+    x: point.x,
+    y: point.y,
+    width: 0,
+    height: 0,
+  };
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function handleEditorPointerMoveV2(event) {
+  if (!state.editor.isPointerDown || !state.editor.workingCanvas) {
+    return;
+  }
+
+  const point = getEditorCanvasPoint(event);
+  if (!point) {
+    return;
+  }
+
+  if (state.editor.tool === "draw" || state.editor.tool === "erase") {
+    if (state.editor.lastPoint) {
+      drawEditorStrokeV2(state.editor.lastPoint, point);
+    }
+
+    state.editor.lastPoint = point;
+    state.editor.strokeDirty = true;
+    scheduleRenderImageEditorV2();
+    return;
+  }
+
+  if (!state.editor.cropStart) {
+    return;
+  }
+
+  state.editor.cropRect = {
+    x: state.editor.cropStart.x,
+    y: state.editor.cropStart.y,
+    width: point.x - state.editor.cropStart.x,
+    height: point.y - state.editor.cropStart.y,
+  };
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function handleEditorPointerUpV2(event) {
+  if (!state.editor.isPointerDown) {
+    return;
+  }
+
+  if (elements.editorCanvas?.hasPointerCapture?.(event.pointerId)) {
+    elements.editorCanvas.releasePointerCapture(event.pointerId);
+  }
+
+  state.editor.isPointerDown = false;
+  state.editor.lastPoint = null;
+  state.editor.cropStart = null;
+
+  if ((state.editor.tool === "draw" || state.editor.tool === "erase") && state.editor.strokeDirty) {
+    pushEditorHistorySnapshotV2();
+    state.editor.strokeDirty = false;
+  }
+
+  if (state.editor.cropRect && state.editor.tool === "crop") {
+    const normalizedRect = normalizeCropRect(state.editor.cropRect);
+    if (normalizedRect.width < 8 || normalizedRect.height < 8) {
+      state.editor.cropRect = null;
+    }
+  }
+
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function drawEditorStrokeV2(from, to) {
+  if (!state.editor.workingContext) {
+    return;
+  }
+
+  state.editor.workingContext.save();
+  state.editor.workingContext.globalCompositeOperation =
+    state.editor.tool === "erase" ? "destination-out" : "source-over";
+  state.editor.workingContext.strokeStyle = state.editor.tool === "erase" ? "#000000" : state.editor.color;
+  state.editor.workingContext.lineWidth = state.editor.brushSize;
+  state.editor.workingContext.lineCap = "round";
+  state.editor.workingContext.lineJoin = "round";
+  state.editor.workingContext.beginPath();
+  state.editor.workingContext.moveTo(from.x, from.y);
+  state.editor.workingContext.lineTo(to.x, to.y);
+  state.editor.workingContext.stroke();
+  state.editor.workingContext.restore();
+}
+
+function applyEditorCropV2() {
+  if (!state.editor.workingCanvas || !state.editor.cropRect || state.editor.isSaving) {
+    return;
+  }
+
+  const rect = normalizeCropRect(state.editor.cropRect);
+  if (rect.width < 8 || rect.height < 8) {
+    setStatus("裁切範圍太小。", true);
+    return;
+  }
+
+  const nextCanvas = document.createElement("canvas");
+  nextCanvas.width = rect.width;
+  nextCanvas.height = rect.height;
+  const nextContext = nextCanvas.getContext("2d");
+  if (!nextContext) {
+    setStatus("裁切失敗。", true);
+    return;
+  }
+
+  nextContext.drawImage(
+    state.editor.workingCanvas,
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+    0,
+    0,
+    rect.width,
+    rect.height,
+  );
+
+  state.editor.cropRect = null;
+  setEditorWorkingCanvasV2(nextCanvas, { pushHistory: true, context: nextContext });
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+  setStatus("已套用裁切。");
+}
+
+function undoImageEditorV2() {
+  restoreEditorHistorySnapshotV2(state.editor.historyIndex - 1);
+}
+
+function redoImageEditorV2() {
+  restoreEditorHistorySnapshotV2(state.editor.historyIndex + 1);
+}
+
+function rotateImageEditorV2(direction) {
+  if (!state.editor.workingCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  const source = state.editor.workingCanvas;
+  const nextCanvas = document.createElement("canvas");
+  nextCanvas.width = source.height;
+  nextCanvas.height = source.width;
+
+  const nextContext = nextCanvas.getContext("2d");
+  if (!nextContext) {
+    return;
+  }
+
+  nextContext.save();
+  if (direction > 0) {
+    nextContext.translate(nextCanvas.width, 0);
+    nextContext.rotate(Math.PI / 2);
+  } else {
+    nextContext.translate(0, nextCanvas.height);
+    nextContext.rotate(-Math.PI / 2);
+  }
+  nextContext.drawImage(source, 0, 0);
+  nextContext.restore();
+
+  state.editor.cropRect = null;
+  setEditorWorkingCanvasV2(nextCanvas, { pushHistory: true, context: nextContext });
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function createScaledEditorCanvasV2(image) {
+  const scale = Math.min(EDITOR_MAX_EDGE / image.naturalWidth, EDITOR_MAX_EDGE / image.naturalHeight, 1);
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, width, height);
+  return canvas;
+}
+
+function cloneEditorCanvasV2(sourceCanvas) {
+  const canvas = document.createElement("canvas");
+  canvas.width = sourceCanvas.width;
+  canvas.height = sourceCanvas.height;
+  const context = canvas.getContext("2d");
+  context?.drawImage(sourceCanvas, 0, 0);
+  return canvas;
+}
+
+function setEditorWorkingCanvasV2(canvas, options = {}) {
+  const context = options.context || canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  state.editor.workingCanvas = canvas;
+  state.editor.workingContext = context;
+
+  if (options.pushHistory) {
+    pushEditorHistorySnapshotV2();
+  }
+}
+
+function pushEditorHistorySnapshotV2() {
+  if (!state.editor.workingCanvas) {
+    return;
+  }
+
+  const snapshot = cloneEditorCanvasV2(state.editor.workingCanvas);
+  const nextHistory = state.editor.history.slice(0, state.editor.historyIndex + 1);
+  nextHistory.push(snapshot);
+
+  if (nextHistory.length > EDITOR_HISTORY_LIMIT) {
+    nextHistory.shift();
+  }
+
+  state.editor.history = nextHistory;
+  state.editor.historyIndex = nextHistory.length - 1;
+}
+
+function restoreEditorHistorySnapshotV2(index) {
+  if (
+    state.editor.isSaving ||
+    index < 0 ||
+    index >= state.editor.history.length ||
+    !state.editor.history[index]
+  ) {
+    return;
+  }
+
+  const snapshot = cloneEditorCanvasV2(state.editor.history[index]);
+  setEditorWorkingCanvasV2(snapshot);
+  state.editor.historyIndex = index;
+  state.editor.cropRect = null;
+  syncEditorControlsV2();
+  scheduleRenderImageEditorV2();
+}
+
+function getEditorHintTextV2() {
+  if (state.editor.tool === "crop") {
+    return "拖拉框選要保留的範圍，再按套用裁切。";
+  }
+
+  if (state.editor.tool === "erase") {
+    return "拖曳即可擦除，支援上一步與下一步。";
+  }
+
+  return "拖曳即可畫線，顏色和粗細可以在右側調整。";
+}
+
+async function saveImageEditorV2() {
+  if (!state.activePreview || !state.editor.workingCanvas || state.editor.isSaving) {
+    return;
+  }
+
+  try {
+    state.editor.isSaving = true;
+    setEditorBusyV2(true);
+
+    const mimeType = getEditorOutputType(state.activePreview.originalName);
+    const editedBlob = await canvasToBlob(state.editor.workingCanvas, mimeType);
+    const editedFile = new File([editedBlob], state.activePreview.originalName || "image.png", {
+      type: editedBlob.type || mimeType,
+    });
+
+    const formData = new FormData();
+    formData.set("imageId", state.activePreview.id);
+    formData.set("file", editedFile);
+
+    const response = await fetch("/api/images", {
+      method: "PUT",
+      body: formData,
+    });
+
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "儲存圖片失敗。");
+    }
+
+    applyEditedImage(payload.image);
+    closeImageEditorV2({ force: true });
+    setStatus("圖片已更新。");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "儲存圖片失敗。", true);
+  } finally {
+    state.editor.isSaving = false;
+    setEditorBusyV2(false);
+  }
+}
+
+function setEditorBusyV2(isBusy) {
+  if (elements.editPreview) {
+    elements.editPreview.disabled = isBusy;
+  }
+
+  if (elements.editorCropTool) {
+    elements.editorCropTool.disabled = isBusy;
+  }
+
+  if (elements.editorDrawTool) {
+    elements.editorDrawTool.disabled = isBusy;
+  }
+
+  if (elements.editorEraserTool) {
+    elements.editorEraserTool.disabled = isBusy;
+  }
+
+  if (elements.applyCropTool) {
+    elements.applyCropTool.disabled = isBusy || !state.editor.cropRect;
+  }
+
+  if (elements.editorUndo) {
+    elements.editorUndo.disabled = isBusy || state.editor.historyIndex <= 0;
+  }
+
+  if (elements.editorRedo) {
+    elements.editorRedo.disabled =
+      isBusy || state.editor.historyIndex >= state.editor.history.length - 1;
+  }
+
+  if (elements.editorRotateLeft) {
+    elements.editorRotateLeft.disabled = isBusy;
+  }
+
+  if (elements.editorRotateRight) {
+    elements.editorRotateRight.disabled = isBusy;
+  }
+
+  if (elements.resetEditor) {
+    elements.resetEditor.disabled = isBusy;
+  }
+
+  if (elements.editorColor) {
+    elements.editorColor.disabled = isBusy;
+  }
+
+  if (elements.editorBrushSize) {
+    elements.editorBrushSize.disabled = isBusy;
+  }
+
+  if (elements.closeEditor) {
+    elements.closeEditor.disabled = isBusy;
+  }
+
+  if (elements.saveEditor) {
+    elements.saveEditor.disabled = isBusy;
+  }
 }

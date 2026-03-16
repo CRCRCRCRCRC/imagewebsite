@@ -45,7 +45,6 @@
                 </span>
                 <strong>新增資料夾</strong>
               </button>
-
             </section>
           </aside>
         </section>
@@ -171,34 +170,60 @@
 
     <div class="image-editor" id="imageEditor" aria-hidden="true">
       <section class="image-editor-shell" role="dialog" aria-modal="true" aria-label="編輯圖片">
-        <div class="image-editor-toolbar">
-          <div class="image-editor-tools">
-            <button type="button" class="editor-tool active" id="editorCropTool">裁切</button>
-            <button type="button" class="editor-tool" id="editorDrawTool">畫筆</button>
-            <button type="button" class="editor-tool" id="applyCropTool">套用裁切</button>
-            <button type="button" class="editor-tool" id="resetEditor">重設</button>
+        <div class="image-editor-stage-shell">
+          <div class="image-editor-stage-head">
+            <div>
+              <p class="image-editor-title">編輯圖片</p>
+              <p class="image-editor-hint" id="editorHint">裁切用拖拉框選，畫筆可以直接畫上去。</p>
+            </div>
           </div>
 
-          <div class="image-editor-controls">
-            <label class="editor-control">
-              <span>顏色</span>
-              <input type="color" id="editorColor" value="#0f1a2b" />
-            </label>
-            <label class="editor-control editor-control-range">
-              <span>筆刷</span>
-              <input type="range" id="editorBrushSize" min="2" max="32" value="8" />
-            </label>
+          <div class="image-editor-stage" id="editorStage">
+            <canvas id="editorCanvas" tabindex="0"></canvas>
           </div>
+        </div>
+
+        <aside class="image-editor-panel">
+          <section class="image-editor-group">
+            <p class="image-editor-label">工具</p>
+            <div class="image-editor-tool-grid">
+              <button type="button" class="editor-tool active" id="editorCropTool">裁切</button>
+              <button type="button" class="editor-tool" id="editorDrawTool">畫筆</button>
+              <button type="button" class="editor-tool" id="editorEraserTool">橡皮擦</button>
+              <button type="button" class="editor-tool" id="applyCropTool">套用裁切</button>
+            </div>
+          </section>
+
+          <section class="image-editor-group">
+            <p class="image-editor-label">調整</p>
+            <div class="image-editor-tool-grid image-editor-tool-grid-compact">
+              <button type="button" class="editor-tool" id="editorUndo">上一步</button>
+              <button type="button" class="editor-tool" id="editorRedo">下一步</button>
+              <button type="button" class="editor-tool" id="editorRotateLeft">向左轉</button>
+              <button type="button" class="editor-tool" id="editorRotateRight">向右轉</button>
+              <button type="button" class="editor-tool" id="resetEditor">重設</button>
+            </div>
+          </section>
+
+          <section class="image-editor-group">
+            <p class="image-editor-label">筆刷</p>
+            <div class="image-editor-controls">
+              <label class="editor-control">
+                <span>顏色</span>
+                <input type="color" id="editorColor" value="#0f1a2b" />
+              </label>
+              <label class="editor-control editor-control-range">
+                <span>粗細</span>
+                <input type="range" id="editorBrushSize" min="2" max="32" value="8" />
+              </label>
+            </div>
+          </section>
 
           <div class="image-editor-actions">
             <button type="button" class="ghost-button upload-text-button" id="closeEditor">取消</button>
             <button type="button" class="solid-button upload-text-button" id="saveEditor">儲存</button>
           </div>
-        </div>
-
-        <div class="image-editor-stage" id="editorStage">
-          <canvas id="editorCanvas" tabindex="0"></canvas>
-        </div>
+        </aside>
       </section>
     </div>
 
