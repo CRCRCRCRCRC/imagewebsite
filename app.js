@@ -1297,9 +1297,7 @@ function renderGallery() {
     return;
   }
 
-  const images = state.selectedFolderId
-    ? state.images.filter((image) => image.folderId === state.selectedFolderId)
-    : state.images;
+  const images = getVisibleImages();
 
   elements.galleryGrid.innerHTML = "";
   elements.galleryStage.hidden = images.length === 0;
@@ -1353,6 +1351,11 @@ function getSelectedFolder() {
 
 function getRootFolder() {
   return state.folders.find((folder) => folder.id === ROOT_FOLDER_ID) ?? null;
+}
+
+function getVisibleImages() {
+  const activeFolderId = state.selectedFolderId || getRootFolder()?.id || ROOT_FOLDER_ID;
+  return state.images.filter((image) => image.folderId === activeFolderId);
 }
 
 function saveSelectedFolder() {
