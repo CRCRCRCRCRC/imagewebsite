@@ -1,4 +1,4 @@
-import { renameImage, replaceImage } from "../lib/blob.js";
+import { deleteImage, renameImage, replaceImage } from "../lib/blob.js";
 
 export async function PATCH(request) {
   try {
@@ -41,6 +41,23 @@ export async function PUT(request) {
   } catch (error) {
     console.error(error);
     return json({ error: error.message || "更新圖片失敗。" }, 400);
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const body = await request.json();
+    const imageId = String(body?.imageId || "").trim();
+
+    if (!imageId) {
+      return json({ error: "Missing image ID." }, 400);
+    }
+
+    await deleteImage(imageId);
+    return json({ imageId });
+  } catch (error) {
+    console.error(error);
+    return json({ error: error.message || "Failed to delete image." }, 400);
   }
 }
 

@@ -48,6 +48,7 @@ const elements = {
   closePreview: document.querySelector("#closePreview"),
   downloadPreview: document.querySelector("#downloadPreview"),
   copyPreview: document.querySelector("#copyPreview"),
+  deletePreview: document.querySelector("#deletePreview"),
   folderList: document.querySelector("#folderList"),
   galleryStage: document.querySelector("#galleryStage"),
   galleryGrid: document.querySelector("#galleryGrid"),
@@ -132,6 +133,7 @@ function bindEvents() {
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
   elements.copyPreview?.addEventListener("click", handleCopyPreview);
+  elements.deletePreview?.addEventListener("click", handleDeletePreview);
   elements.editorCropTool?.addEventListener("click", () => setEditorToolV2("crop"));
   elements.editorDrawTool?.addEventListener("click", () => setEditorToolV2("draw"));
   elements.editorEraserTool?.addEventListener("click", () => setEditorToolV2("erase"));
@@ -1648,6 +1650,47 @@ async function handleRenamePreview() {
   }
 }
 
+async function handleDeletePreview() {
+  if (!state.activePreview) {
+    return;
+  }
+
+  const image = state.activePreview;
+  const imageLabel = image.name || "這張圖片";
+  const confirmed = window.confirm(`確定要刪除「${imageLabel}」嗎？這個動作不能復原。`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setViewerBusy(true);
+
+    const response = await fetch("/api/images", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageId: image.id,
+      }),
+    });
+
+    const payload = await parseJson(response);
+    if (!response.ok) {
+      throw new Error(payload.error || "刪除圖片失敗。");
+    }
+
+    removeImageFromState(image.id);
+    closeImageViewer();
+    setStatus(`已刪除 ${imageLabel}`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "刪除圖片失敗。", true);
+  } finally {
+    setViewerBusy(false);
+  }
+}
+
 async function fetchPreviewBlob() {
   if (!state.activePreview) {
     throw new Error("目前沒有可用的圖片。");
@@ -1680,6 +1723,10 @@ function setViewerBusy(isBusy) {
   if (elements.copyPreview) {
     elements.copyPreview.disabled = isBusy;
   }
+
+  if (elements.deletePreview) {
+    elements.deletePreview.disabled = isBusy;
+  }
 }
 
 function applyRenamedImage(imageId, name) {
@@ -1700,6 +1747,26 @@ function applyRenamedImage(imageId, name) {
 
   saveLibraryCache();
   render();
+}
+
+function removeImageFromState(imageId) {
+  state.images = state.images.filter((image) => image.id !== imageId);
+  syncFolderImageCounts();
+  saveLibraryCache();
+  render();
+}
+
+function syncFolderImageCounts() {
+  const imageCountByFolder = new Map();
+
+  state.images.forEach((image) => {
+    imageCountByFolder.set(image.folderId, (imageCountByFolder.get(image.folderId) || 0) + 1);
+  });
+
+  state.folders = state.folders.map((folder) => ({
+    ...folder,
+    imageCount: imageCountByFolder.get(folder.id) || 0,
+  }));
 }
 
 function getDownloadFileName(image) {

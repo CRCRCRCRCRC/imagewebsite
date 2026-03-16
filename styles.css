@@ -782,6 +782,14 @@ body::selection {
   outline-offset: 3px;
 }
 
+.viewer-icon-button-danger {
+  background: rgba(168, 32, 56, 0.28);
+}
+
+.viewer-icon-button-danger:hover {
+  background: rgba(204, 46, 74, 0.4);
+}
+
 .viewer-open {
   overflow: hidden;
 }
