@@ -32,7 +32,7 @@
           </section>
 
           <aside class="sidebar-tools">
-            <section class="desktop-grid" aria-label="Actions">
+            <section class="desktop-grid" aria-label="操作按鈕">
               <button class="desktop-action desktop-action-primary" id="uploadTrigger" type="button">
                 <span class="icon-surface" aria-hidden="true">
                   <svg viewBox="0 0 120 120" class="line-icon upload-icon">
@@ -59,7 +59,7 @@
           </aside>
         </section>
 
-        <section class="folder-strip" id="folderList" aria-label="Folders" hidden></section>
+        <section class="folder-strip" id="folderList" aria-label="資料夾" hidden></section>
       </section>
 
       <input id="fileInput" type="file" accept="image/*" multiple hidden />
@@ -71,7 +71,7 @@
             <p class="upload-modal-subtitle">貼上、拖曳，或從本機一次選多張。</p>
           </div>
 
-          <div class="upload-dropzone" id="uploadDropzone" tabindex="0" role="button" aria-label="拖曳、貼上或選擇圖片">
+          <div class="upload-dropzone" id="uploadDropzone" tabindex="0" role="button" aria-label="拖曳或貼上圖片到這裡">
             <span class="upload-dropzone-icon" aria-hidden="true">
               <svg viewBox="0 0 120 120" class="line-icon upload-icon">
                 <path d="M30 81H24c-9 0-16-7-16-16 0-9 7-16 16-16h4c3-15 17-26 33-26 13 0 25 7 31 18h5c10 0 18 8 18 18s-8 18-18 18h-7" />
@@ -193,7 +193,7 @@
           <div class="image-editor-stage-head">
             <div>
               <p class="image-editor-title">編輯圖片</p>
-              <p class="image-editor-hint" id="editorHint">裁切用拖拉框選，畫筆可以直接畫上去。</p>
+              <p class="image-editor-hint" id="editorHint">裁切、畫筆、橡皮擦、旋轉都在右邊。</p>
             </div>
           </div>
 
@@ -225,7 +225,7 @@
           </section>
 
           <section class="image-editor-group">
-            <p class="image-editor-label">筆刷</p>
+            <p class="image-editor-label">畫筆</p>
             <div class="image-editor-controls">
               <label class="editor-control">
                 <span>顏色</span>
@@ -247,24 +247,63 @@
     </div>
 
     <div class="notebook-mode" id="notebookMode" aria-hidden="true">
-      <section class="notebook-shell" role="dialog" aria-modal="true" aria-label="筆記本模式">
+      <section class="notebook-shell" role="dialog" aria-modal="true" aria-label="Notebook">
         <div class="notebook-toolbar">
-          <div class="notebook-chip">Notebook</div>
-          <button type="button" class="notebook-close-button" id="closeNotebookMode" aria-label="關閉筆記本模式">
-            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
-              <path d="M6 6l12 12" />
-              <path d="M18 6L6 18" />
-            </svg>
-          </button>
+          <div class="notebook-toolbar-copy">
+            <div class="notebook-chip">Workspace</div>
+            <div class="notebook-heading">
+              <h2>Notebook</h2>
+              <p>寫筆記，或切到 To-Do List 直接新增事項。</p>
+            </div>
+          </div>
+
+          <div class="notebook-toolbar-actions">
+            <div class="notebook-mode-switch" role="tablist" aria-label="筆記模式切換">
+              <button type="button" class="notebook-switch-button active" id="showNotebookNotes" role="tab" aria-selected="true">
+                筆記
+              </button>
+              <button type="button" class="notebook-switch-button" id="showNotebookTodo" role="tab" aria-selected="false">
+                To-Do List
+              </button>
+            </div>
+
+            <button type="button" class="notebook-close-button" id="closeNotebookMode" aria-label="關閉筆記本模式">
+              <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+                <path d="M6 6l12 12" />
+                <path d="M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div class="notebook-page">
-          <textarea
-            id="notebookTextarea"
-            class="notebook-textarea"
-            spellcheck="false"
-            placeholder="在這裡打字"
-          ></textarea>
+        <div class="notebook-stage">
+          <section class="notebook-panel notebook-panel-notes active" id="notebookNotesPanel" role="tabpanel" aria-labelledby="showNotebookNotes">
+            <div class="notebook-panel-head">
+              <strong>自由筆記</strong>
+              <span>這裡就是純文字區。</span>
+            </div>
+
+            <textarea
+              id="notebookTextarea"
+              class="notebook-textarea"
+              spellcheck="false"
+              placeholder="在這裡打字"
+            ></textarea>
+          </section>
+
+          <section class="notebook-panel notebook-panel-todo" id="notebookTodoPanel" role="tabpanel" aria-labelledby="showNotebookTodo" hidden>
+            <div class="notebook-panel-head">
+              <strong>To-Do List</strong>
+              <span>輸入一行內容，按新增就會進清單。</span>
+            </div>
+
+            <form class="todo-composer" id="todoForm">
+              <input id="todoInput" class="todo-input" type="text" maxlength="120" autocomplete="off" placeholder="輸入待辦事項" />
+              <button type="submit" class="todo-add-button" id="addTodoButton">新增</button>
+            </form>
+
+            <div class="todo-list" id="todoList"></div>
+          </section>
         </div>
       </section>
     </div>

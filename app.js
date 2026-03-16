@@ -8,12 +8,21 @@ const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
 const LIBRARY_CACHE_KEY = "image-space-library";
 const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 const NOTEBOOK_CONTENT_KEY = "image-space-notebook-content";
+const NOTEBOOK_VIEW_KEY = "image-space-notebook-view";
+const NOTEBOOK_TODOS_KEY = "image-space-notebook-todos";
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
   closeNotebookMode: document.querySelector("#closeNotebookMode"),
   notebookMode: document.querySelector("#notebookMode"),
   notebookTextarea: document.querySelector("#notebookTextarea"),
+  showNotebookNotes: document.querySelector("#showNotebookNotes"),
+  showNotebookTodo: document.querySelector("#showNotebookTodo"),
+  notebookNotesPanel: document.querySelector("#notebookNotesPanel"),
+  notebookTodoPanel: document.querySelector("#notebookTodoPanel"),
+  todoForm: document.querySelector("#todoForm"),
+  todoInput: document.querySelector("#todoInput"),
+  todoList: document.querySelector("#todoList"),
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
   uploadModal: document.querySelector("#uploadModal"),
@@ -74,13 +83,15 @@ const state = {
   uploadQueue: [],
   editor: createEditorStateV2(),
   notebookSaveTimer: 0,
+  notebookView: "notes",
+  notebookTodos: [],
 };
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
-  restoreNotebookDraft();
+  restoreNotebookState();
   restoreLibraryCache();
   setBusy(true);
 
@@ -100,6 +111,11 @@ function bindEvents() {
   elements.closeNotebookMode?.addEventListener("click", closeNotebookMode);
   elements.notebookTextarea?.addEventListener("input", handleNotebookInput);
   elements.notebookTextarea?.addEventListener("blur", persistNotebookDraft);
+  elements.showNotebookNotes?.addEventListener("click", () => setNotebookView("notes"));
+  elements.showNotebookTodo?.addEventListener("click", () => setNotebookView("todo"));
+  elements.todoForm?.addEventListener("submit", handleTodoSubmit);
+  elements.todoList?.addEventListener("click", handleTodoListClick);
+  elements.todoList?.addEventListener("change", handleTodoListChange);
   elements.uploadTrigger?.addEventListener("click", () => {
     if (state.isBusy) {
       return;
@@ -231,14 +247,23 @@ function bindEvents() {
 }
 
 function openNotebookMode() {
+  renderNotebookView();
   elements.notebookMode?.classList.add("open");
   elements.notebookMode?.setAttribute("aria-hidden", "false");
   document.body.classList.add("notebook-open");
-  requestAnimationFrame(() => elements.notebookTextarea?.focus());
+  requestAnimationFrame(() => {
+    if (state.notebookView === "todo") {
+      elements.todoInput?.focus();
+      return;
+    }
+
+    elements.notebookTextarea?.focus();
+  });
 }
 
 function closeNotebookMode() {
   persistNotebookDraft();
+  persistNotebookTodos();
   elements.notebookMode?.classList.remove("open");
   elements.notebookMode?.setAttribute("aria-hidden", "true");
   document.body.classList.remove("notebook-open");
@@ -1104,12 +1129,165 @@ function persistNotebookDraft() {
   localStorage.setItem(NOTEBOOK_CONTENT_KEY, elements.notebookTextarea.value);
 }
 
-function restoreNotebookDraft() {
-  if (!elements.notebookTextarea) {
+function persistNotebookTodos() {
+  localStorage.setItem(NOTEBOOK_TODOS_KEY, JSON.stringify(state.notebookTodos));
+}
+
+function restoreNotebookState() {
+  if (elements.notebookTextarea) {
+    elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
+  }
+
+  const savedView = localStorage.getItem(NOTEBOOK_VIEW_KEY);
+  if (savedView === "todo") {
+    state.notebookView = "todo";
+  }
+
+  try {
+    const parsedTodos = JSON.parse(localStorage.getItem(NOTEBOOK_TODOS_KEY) || "[]");
+    state.notebookTodos = Array.isArray(parsedTodos)
+      ? parsedTodos
+          .filter((item) => item && typeof item.text === "string")
+          .map((item) => ({
+            id: String(item.id || crypto.randomUUID()),
+            text: item.text.trim(),
+            done: Boolean(item.done),
+          }))
+          .filter((item) => item.text)
+      : [];
+  } catch (error) {
+    console.error(error);
+    state.notebookTodos = [];
+  }
+
+  renderNotebookView();
+}
+
+function setNotebookView(view) {
+  state.notebookView = view === "todo" ? "todo" : "notes";
+  localStorage.setItem(NOTEBOOK_VIEW_KEY, state.notebookView);
+  renderNotebookView();
+}
+
+function renderNotebookView() {
+  const showTodo = state.notebookView === "todo";
+
+  elements.showNotebookNotes?.classList.toggle("active", !showTodo);
+  elements.showNotebookTodo?.classList.toggle("active", showTodo);
+  elements.showNotebookNotes?.setAttribute("aria-selected", String(!showTodo));
+  elements.showNotebookTodo?.setAttribute("aria-selected", String(showTodo));
+
+  if (elements.notebookNotesPanel) {
+    elements.notebookNotesPanel.hidden = showTodo;
+    elements.notebookNotesPanel.classList.toggle("active", !showTodo);
+  }
+
+  if (elements.notebookTodoPanel) {
+    elements.notebookTodoPanel.hidden = !showTodo;
+    elements.notebookTodoPanel.classList.toggle("active", showTodo);
+  }
+
+  renderTodoList();
+}
+
+function handleTodoSubmit(event) {
+  event.preventDefault();
+
+  const text = elements.todoInput?.value.trim() || "";
+  if (!text) {
     return;
   }
 
-  elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
+  state.notebookTodos = [
+    {
+      id: crypto.randomUUID(),
+      text,
+      done: false,
+    },
+    ...state.notebookTodos,
+  ];
+
+  if (elements.todoInput) {
+    elements.todoInput.value = "";
+    elements.todoInput.focus();
+  }
+
+  persistNotebookTodos();
+  renderTodoList();
+}
+
+function handleTodoListClick(event) {
+  const deleteButton = event.target.closest("[data-delete-todo]");
+  if (!deleteButton) {
+    return;
+  }
+
+  const todoId = deleteButton.getAttribute("data-delete-todo");
+  state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
+  persistNotebookTodos();
+  renderTodoList();
+}
+
+function handleTodoListChange(event) {
+  const checkbox = event.target.closest("[data-toggle-todo]");
+  if (!checkbox) {
+    return;
+  }
+
+  const todoId = checkbox.getAttribute("data-toggle-todo");
+  state.notebookTodos = state.notebookTodos.map((item) =>
+    item.id === todoId
+      ? {
+          ...item,
+          done: checkbox.checked,
+        }
+      : item,
+  );
+
+  persistNotebookTodos();
+  renderTodoList();
+}
+
+function renderTodoList() {
+  if (!elements.todoList) {
+    return;
+  }
+
+  elements.todoList.innerHTML = "";
+
+  if (state.notebookTodos.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "todo-empty";
+    emptyState.textContent = "還沒有待辦事項。";
+    elements.todoList.append(emptyState);
+    return;
+  }
+
+  state.notebookTodos.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `todo-item${item.done ? " done" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "todo-item-checkbox";
+    checkbox.checked = item.done;
+    checkbox.setAttribute("data-toggle-todo", item.id);
+    checkbox.setAttribute("aria-label", `切換 ${item.text}`);
+
+    const label = document.createElement("span");
+    label.className = "todo-item-label";
+    label.textContent = item.text;
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "todo-item-delete";
+    deleteButton.setAttribute("data-delete-todo", item.id);
+    deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
+    deleteButton.textContent = "×";
+
+    row.append(checkbox, label, deleteButton);
+    elements.todoList?.append(row);
+  });
 }
 
 function getUploadQueueKey(file) {
