@@ -10,6 +10,11 @@ const SELECTED_FOLDER_KEY = "image-space-selected-folder";
 const NOTEBOOK_CONTENT_KEY = "image-space-notebook-content";
 const NOTEBOOK_VIEW_KEY = "image-space-notebook-view";
 const NOTEBOOK_TODOS_KEY = "image-space-notebook-todos";
+const LEGACY_NOTEBOOK_TODO_KEYS = [
+  NOTEBOOK_TODOS_KEY,
+  "image-space-notebook-todo-list",
+  "image-space-todos",
+];
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
@@ -92,7 +97,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
-  restoreNotebookState();
+  restoreNotebookStateV2();
   restoreLibraryCache();
   setBusy(true);
 
@@ -219,6 +224,8 @@ function bindEvents() {
 
   document.addEventListener("paste", handleUploadPaste);
   window.addEventListener("resize", handleEditorViewportChangeV2);
+  window.addEventListener("pagehide", persistNotebookDraft);
+  window.addEventListener("pagehide", persistNotebookTodos);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isNotebookOpen()) {
@@ -1189,7 +1196,7 @@ function renderNotebookView() {
     elements.notebookTodoPanel.classList.toggle("active", showTodo);
   }
 
-  renderTodoList();
+  renderTodoListV2();
 }
 
 function handleTodoSubmit(event) {
@@ -1221,7 +1228,7 @@ function handleTodoSubmit(event) {
   }
 
   persistNotebookTodos();
-  renderTodoList();
+  renderTodoListV2();
 }
 
 function handleTodoListClick(event) {
@@ -1233,7 +1240,7 @@ function handleTodoListClick(event) {
   const todoId = deleteButton.getAttribute("data-delete-todo");
   state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
   persistNotebookTodos();
-  renderTodoList();
+  renderTodoListV2();
 }
 
 function handleTodoListChange(event) {
@@ -1253,7 +1260,7 @@ function handleTodoListChange(event) {
   );
 
   persistNotebookTodos();
-  renderTodoList();
+  renderTodoListV2();
 }
 
 function renderTodoList() {
@@ -1306,6 +1313,122 @@ function normalizeTodoPrice(value) {
   return String(value || "")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function restoreNotebookStateV2() {
+  if (elements.notebookTextarea) {
+    elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
+  }
+
+  const savedView = localStorage.getItem(NOTEBOOK_VIEW_KEY);
+  if (savedView === "todo") {
+    state.notebookView = "todo";
+  }
+
+  state.notebookTodos = loadStoredNotebookTodosV2();
+  renderNotebookView();
+}
+
+function renderTodoListV2() {
+  if (!elements.todoList) {
+    return;
+  }
+
+  elements.todoList.innerHTML = "";
+
+  if (state.notebookTodos.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "todo-empty";
+    emptyState.textContent = "還沒有待辦事項。";
+    elements.todoList.append(emptyState);
+    return;
+  }
+
+  state.notebookTodos.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `todo-item${item.done ? " done" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "todo-item-checkbox";
+    checkbox.checked = item.done;
+    checkbox.setAttribute("data-toggle-todo", item.id);
+    checkbox.setAttribute("aria-label", `切換 ${item.text}`);
+
+    const label = document.createElement("span");
+    label.className = "todo-item-label";
+    label.textContent = item.text;
+
+    const price = document.createElement("span");
+    price.className = "todo-item-price";
+    price.textContent = item.price || "-";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "todo-item-delete";
+    deleteButton.setAttribute("data-delete-todo", item.id);
+    deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
+    deleteButton.textContent = "×";
+
+    row.append(checkbox, label, price, deleteButton);
+    elements.todoList.append(row);
+  });
+}
+
+function loadStoredNotebookTodosV2() {
+  for (const key of LEGACY_NOTEBOOK_TODO_KEYS) {
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : [];
+      const normalized = items.map(normalizeStoredTodoItemV2).filter(Boolean);
+
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  return [];
+}
+
+function normalizeStoredTodoItemV2(item) {
+  if (typeof item === "string") {
+    const text = item.trim();
+    if (!text) {
+      return null;
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      text,
+      price: "",
+      done: false,
+    };
+  }
+
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const textSource = item.text ?? item.label ?? item.title ?? item.content ?? "";
+  const text = String(textSource).trim();
+  if (!text) {
+    return null;
+  }
+
+  return {
+    id: String(item.id || crypto.randomUUID()),
+    text,
+    price: normalizeTodoPrice(item.price ?? item.amount ?? item.value ?? ""),
+    done: Boolean(item.done ?? item.checked ?? item.completed),
+  };
 }
 
 function getUploadQueueKey(file) {

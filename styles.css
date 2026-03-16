@@ -422,6 +422,7 @@ body::selection {
 .notebook-stage {
   min-height: 0;
   display: grid;
+  overflow: hidden;
 }
 
 .notebook-panel {
@@ -489,13 +490,17 @@ body::selection {
 }
 
 .notebook-panel-todo {
-  align-content: start;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
 }
 
 .todo-composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 128px auto;
   gap: 12px;
+  align-items: center;
+  padding: 4px 0 2px;
 }
 
 .todo-input {
@@ -555,8 +560,11 @@ body::selection {
   display: grid;
   align-content: start;
   gap: 12px;
-  padding-right: 4px;
+  padding-top: 2px;
+  padding-right: 8px;
+  padding-bottom: 8px;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .todo-item {
