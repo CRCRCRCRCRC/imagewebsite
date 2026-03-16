@@ -267,8 +267,8 @@ body::selection {
   inset: 0;
   z-index: 60;
   display: grid;
-  place-items: center;
-  padding: 22px;
+  place-items: stretch;
+  padding: 0;
   background:
     radial-gradient(circle at top left, rgba(255, 224, 178, 0.18), transparent 24%),
     linear-gradient(180deg, rgba(7, 14, 28, 0.66), rgba(7, 14, 28, 0.78)),
@@ -290,17 +290,16 @@ body::selection {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 22px;
-  width: min(100%, 1120px);
-  height: min(100%, calc(100vh - 36px));
-  padding: 24px;
-  border-radius: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  width: 100%;
+  height: 100%;
+  padding: 28px 30px 24px;
+  border-radius: 0;
+  border: 0;
   background:
     radial-gradient(circle at top right, rgba(255, 214, 153, 0.22), transparent 18%),
     linear-gradient(180deg, rgba(247, 249, 255, 0.96), rgba(238, 243, 252, 0.92)),
     rgba(244, 247, 255, 0.94);
   box-shadow:
-    0 34px 78px rgba(7, 13, 24, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
@@ -450,6 +449,14 @@ body::selection {
   gap: 6px;
 }
 
+.todo-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .notebook-panel-head strong {
   font-size: 1rem;
 }
@@ -458,6 +465,36 @@ body::selection {
   color: rgba(15, 26, 43, 0.58);
   font-family: "Noto Sans TC", sans-serif;
   font-size: 0.9rem;
+}
+
+.todo-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.todo-summary-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 26, 43, 0.06);
+  color: rgba(15, 26, 43, 0.72);
+  font-family: "Noto Sans TC", sans-serif;
+}
+
+.todo-summary-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.todo-summary-chip strong {
+  font-family: "Space Grotesk", "Noto Sans TC", sans-serif;
+  font-size: 0.94rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .notebook-panel-notes {
@@ -1594,9 +1631,9 @@ body::selection {
 
   .notebook-shell {
     width: 100%;
-    height: min(100%, calc(100vh - 28px));
+    height: 100%;
     gap: 16px;
-    padding: 18px;
+    padding: 22px 20px 18px;
   }
 
   .notebook-toolbar {
@@ -1672,19 +1709,27 @@ body::selection {
   }
 
   .notebook-mode {
-    padding: 10px;
+    padding: 0;
   }
 
   .notebook-shell {
     gap: 12px;
-    height: min(100%, calc(100vh - 20px));
-    padding: 12px;
-    border-radius: 22px;
+    height: 100%;
+    padding: 18px 14px 14px;
+    border-radius: 0;
   }
 
   .notebook-toolbar-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .todo-panel-heading {
+    align-items: flex-start;
+  }
+
+  .todo-summary {
+    width: 100%;
   }
 
   .notebook-mode-switch {

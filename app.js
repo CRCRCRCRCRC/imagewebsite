@@ -29,6 +29,8 @@ const elements = {
   todoInput: document.querySelector("#todoInput"),
   todoPriceInput: document.querySelector("#todoPriceInput"),
   todoList: document.querySelector("#todoList"),
+  todoTotalAmount: document.querySelector("#todoTotalAmount"),
+  todoOpenAmount: document.querySelector("#todoOpenAmount"),
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
   uploadModal: document.querySelector("#uploadModal"),
@@ -1196,7 +1198,7 @@ function renderNotebookView() {
     elements.notebookTodoPanel.classList.toggle("active", showTodo);
   }
 
-  renderTodoListV2();
+  renderTodoListV3();
 }
 
 function handleTodoSubmit(event) {
@@ -1228,7 +1230,7 @@ function handleTodoSubmit(event) {
   }
 
   persistNotebookTodos();
-  renderTodoListV2();
+  renderTodoListV3();
 }
 
 function handleTodoListClick(event) {
@@ -1240,7 +1242,7 @@ function handleTodoListClick(event) {
   const todoId = deleteButton.getAttribute("data-delete-todo");
   state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
   persistNotebookTodos();
-  renderTodoListV2();
+  renderTodoListV3();
 }
 
 function handleTodoListChange(event) {
@@ -1260,7 +1262,7 @@ function handleTodoListChange(event) {
   );
 
   persistNotebookTodos();
-  renderTodoListV2();
+  renderTodoListV3();
 }
 
 function renderTodoList() {
@@ -1429,6 +1431,81 @@ function normalizeStoredTodoItemV2(item) {
     price: normalizeTodoPrice(item.price ?? item.amount ?? item.value ?? ""),
     done: Boolean(item.done ?? item.checked ?? item.completed),
   };
+}
+
+function renderTodoListV3() {
+  if (!elements.todoList) {
+    return;
+  }
+
+  renderTodoSummaryV3();
+  elements.todoList.innerHTML = "";
+
+  if (state.notebookTodos.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "todo-empty";
+    emptyState.textContent = "還沒有待辦事項。";
+    elements.todoList.append(emptyState);
+    return;
+  }
+
+  state.notebookTodos.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `todo-item${item.done ? " done" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "todo-item-checkbox";
+    checkbox.checked = item.done;
+    checkbox.setAttribute("data-toggle-todo", item.id);
+    checkbox.setAttribute("aria-label", `切換 ${item.text}`);
+
+    const label = document.createElement("span");
+    label.className = "todo-item-label";
+    label.textContent = item.text;
+
+    const price = document.createElement("span");
+    price.className = "todo-item-price";
+    price.textContent = item.price || "-";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "todo-item-delete";
+    deleteButton.setAttribute("data-delete-todo", item.id);
+    deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
+    deleteButton.textContent = "×";
+
+    row.append(checkbox, label, price, deleteButton);
+    elements.todoList.append(row);
+  });
+}
+
+function renderTodoSummaryV3() {
+  const totalAmount = state.notebookTodos.reduce((sum, item) => sum + getTodoNumericPriceV3(item.price), 0);
+  const openAmount = state.notebookTodos.reduce(
+    (sum, item) => sum + (item.done ? 0 : getTodoNumericPriceV3(item.price)),
+    0,
+  );
+
+  updateText(elements.todoTotalAmount, formatTodoAmountV3(totalAmount));
+  updateText(elements.todoOpenAmount, formatTodoAmountV3(openAmount));
+}
+
+function getTodoNumericPriceV3(value) {
+  const normalized = String(value || "")
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "");
+  const amount = Number(normalized);
+
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function formatTodoAmountV3(value) {
+  const formatter = Number.isInteger(value)
+    ? new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 })
+    : new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  return formatter.format(value);
 }
 
 function getUploadQueueKey(file) {

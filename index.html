@@ -293,7 +293,19 @@
 
           <section class="notebook-panel notebook-panel-todo" id="notebookTodoPanel" role="tabpanel" aria-labelledby="showNotebookTodo" hidden>
             <div class="notebook-panel-head">
-              <strong>To-Do List</strong>
+              <div class="todo-panel-heading">
+                <strong>To-Do List</strong>
+                <div class="todo-summary" aria-label="待辦金額摘要">
+                  <span class="todo-summary-chip">
+                    <span class="todo-summary-label">總金額</span>
+                    <strong id="todoTotalAmount">0</strong>
+                  </span>
+                  <span class="todo-summary-chip">
+                    <span class="todo-summary-label">未勾選</span>
+                    <strong id="todoOpenAmount">0</strong>
+                  </span>
+                </div>
+              </div>
               <span>輸入一行內容，按新增就會進清單。</span>
             </div>
 
