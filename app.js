@@ -22,6 +22,7 @@ const elements = {
   notebookTodoPanel: document.querySelector("#notebookTodoPanel"),
   todoForm: document.querySelector("#todoForm"),
   todoInput: document.querySelector("#todoInput"),
+  todoPriceInput: document.querySelector("#todoPriceInput"),
   todoList: document.querySelector("#todoList"),
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
@@ -1151,6 +1152,7 @@ function restoreNotebookState() {
           .map((item) => ({
             id: String(item.id || crypto.randomUUID()),
             text: item.text.trim(),
+            price: normalizeTodoPrice(item.price),
             done: Boolean(item.done),
           }))
           .filter((item) => item.text)
@@ -1194,6 +1196,7 @@ function handleTodoSubmit(event) {
   event.preventDefault();
 
   const text = elements.todoInput?.value.trim() || "";
+  const price = normalizeTodoPrice(elements.todoPriceInput?.value);
   if (!text) {
     return;
   }
@@ -1202,6 +1205,7 @@ function handleTodoSubmit(event) {
     {
       id: crypto.randomUUID(),
       text,
+      price,
       done: false,
     },
     ...state.notebookTodos,
@@ -1210,6 +1214,10 @@ function handleTodoSubmit(event) {
   if (elements.todoInput) {
     elements.todoInput.value = "";
     elements.todoInput.focus();
+  }
+
+  if (elements.todoPriceInput) {
+    elements.todoPriceInput.value = "";
   }
 
   persistNotebookTodos();
@@ -1278,6 +1286,10 @@ function renderTodoList() {
     label.className = "todo-item-label";
     label.textContent = item.text;
 
+    const price = document.createElement("span");
+    price.className = "todo-item-price";
+    price.textContent = item.price || "-";
+
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "todo-item-delete";
@@ -1285,9 +1297,15 @@ function renderTodoList() {
     deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
     deleteButton.textContent = "×";
 
-    row.append(checkbox, label, deleteButton);
+    row.append(checkbox, label, price, deleteButton);
     elements.todoList?.append(row);
   });
+}
+
+function normalizeTodoPrice(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function getUploadQueueKey(file) {

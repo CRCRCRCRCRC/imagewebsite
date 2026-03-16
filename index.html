@@ -298,7 +298,16 @@
             </div>
 
             <form class="todo-composer" id="todoForm">
-              <input id="todoInput" class="todo-input" type="text" maxlength="120" autocomplete="off" placeholder="輸入待辦事項" />
+              <input id="todoInput" class="todo-input" type="text" maxlength="120" autocomplete="off" placeholder="輸入項目" />
+              <input
+                id="todoPriceInput"
+                class="todo-input todo-price-input"
+                type="text"
+                inputmode="decimal"
+                maxlength="20"
+                autocomplete="off"
+                placeholder="價格"
+              />
               <button type="submit" class="todo-add-button" id="addTodoButton">新增</button>
             </form>
 
