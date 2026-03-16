@@ -690,6 +690,7 @@ body::selection {
     linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.14)),
     rgba(255, 255, 255, 0.24);
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .image-editor-stage canvas {

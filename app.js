@@ -150,6 +150,12 @@ function bindEvents() {
   elements.editorCanvas?.addEventListener("pointerup", handleEditorPointerUpV2);
   elements.editorCanvas?.addEventListener("pointerleave", handleEditorPointerUpV2);
   elements.editorCanvas?.addEventListener("pointercancel", handleEditorPointerUpV2);
+  elements.editorCanvas?.addEventListener("touchstart", blockEditorGestureV2, { passive: false });
+  elements.editorCanvas?.addEventListener("touchmove", blockEditorGestureV2, { passive: false });
+  elements.editorCanvas?.addEventListener("gesturestart", blockEditorGestureV2);
+  elements.editorCanvas?.addEventListener("gesturechange", blockEditorGestureV2);
+  elements.editorCanvas?.addEventListener("gestureend", blockEditorGestureV2);
+  elements.editorCanvas?.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
 
   elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
@@ -1881,6 +1887,22 @@ function handleEditorViewportChangeV2() {
   scheduleRenderImageEditorV2();
 }
 
+function blockEditorGestureV2(event) {
+  if (!isImageEditorOpen()) {
+    return;
+  }
+
+  event.preventDefault();
+}
+
+function handleEditorWheelZoomV2(event) {
+  if (!isImageEditorOpen() || !event.ctrlKey) {
+    return;
+  }
+
+  event.preventDefault();
+}
+
 function renderImageEditorV2() {
   if (!elements.editorCanvas || !elements.editorStage || !state.editor.workingCanvas) {
     return;
@@ -1953,6 +1975,8 @@ function handleEditorPointerDownV2(event) {
     return;
   }
 
+  event.preventDefault();
+
   const point = getEditorCanvasPoint(event);
   if (!point) {
     return;
@@ -1984,6 +2008,8 @@ function handleEditorPointerMoveV2(event) {
   if (!state.editor.isPointerDown || !state.editor.workingCanvas) {
     return;
   }
+
+  event.preventDefault();
 
   const point = getEditorCanvasPoint(event);
   if (!point) {
@@ -2019,6 +2045,8 @@ function handleEditorPointerUpV2(event) {
   if (!state.editor.isPointerDown) {
     return;
   }
+
+  event.preventDefault();
 
   if (elements.editorCanvas?.hasPointerCapture?.(event.pointerId)) {
     elements.editorCanvas.releasePointerCapture(event.pointerId);
