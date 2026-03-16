@@ -7,8 +7,13 @@ const ROOT_FOLDER_NAME = "我的圖片";
 const ROOT_FOLDER_ID = encodeURIComponent(ROOT_FOLDER_NAME);
 const LIBRARY_CACHE_KEY = "image-space-library";
 const SELECTED_FOLDER_KEY = "image-space-selected-folder";
+const NOTEBOOK_CONTENT_KEY = "image-space-notebook-content";
 
 const elements = {
+  openNotebookMode: document.querySelector("#openNotebookMode"),
+  closeNotebookMode: document.querySelector("#closeNotebookMode"),
+  notebookMode: document.querySelector("#notebookMode"),
+  notebookTextarea: document.querySelector("#notebookTextarea"),
   uploadTrigger: document.querySelector("#uploadTrigger"),
   fileInput: document.querySelector("#fileInput"),
   uploadModal: document.querySelector("#uploadModal"),
@@ -68,12 +73,14 @@ const state = {
   activePreview: null,
   uploadQueue: [],
   editor: createEditorStateV2(),
+  notebookSaveTimer: 0,
 };
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
+  restoreNotebookDraft();
   restoreLibraryCache();
   setBusy(true);
 
@@ -89,6 +96,10 @@ async function init() {
 }
 
 function bindEvents() {
+  elements.openNotebookMode?.addEventListener("click", openNotebookMode);
+  elements.closeNotebookMode?.addEventListener("click", closeNotebookMode);
+  elements.notebookTextarea?.addEventListener("input", handleNotebookInput);
+  elements.notebookTextarea?.addEventListener("blur", persistNotebookDraft);
   elements.uploadTrigger?.addEventListener("click", () => {
     if (state.isBusy) {
       return;
@@ -183,10 +194,21 @@ function bindEvents() {
     }
   });
 
+  elements.notebookMode?.addEventListener("click", (event) => {
+    if (event.target === elements.notebookMode) {
+      closeNotebookMode();
+    }
+  });
+
   document.addEventListener("paste", handleUploadPaste);
   window.addEventListener("resize", handleEditorViewportChangeV2);
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isNotebookOpen()) {
+      closeNotebookMode();
+      return;
+    }
+
     if (event.key === "Escape" && isImageEditorOpen()) {
       closeImageEditorV2();
       return;
@@ -206,6 +228,20 @@ function bindEvents() {
       closeFolderModal();
     }
   });
+}
+
+function openNotebookMode() {
+  elements.notebookMode?.classList.add("open");
+  elements.notebookMode?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("notebook-open");
+  requestAnimationFrame(() => elements.notebookTextarea?.focus());
+}
+
+function closeNotebookMode() {
+  persistNotebookDraft();
+  elements.notebookMode?.classList.remove("open");
+  elements.notebookMode?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("notebook-open");
 }
 
 function openFolderModal() {
@@ -248,6 +284,10 @@ function closeFolderModal() {
 
 function isUploadModalOpen() {
   return elements.uploadModal?.classList.contains("open");
+}
+
+function isNotebookOpen() {
+  return elements.notebookMode?.classList.contains("open");
 }
 
 function createEditorState() {
@@ -1039,6 +1079,37 @@ function addFilesToUploadQueue(files) {
   }
 
   setStatus(notices.join(" "));
+}
+
+function handleNotebookInput() {
+  if (state.notebookSaveTimer) {
+    window.clearTimeout(state.notebookSaveTimer);
+  }
+
+  state.notebookSaveTimer = window.setTimeout(() => {
+    persistNotebookDraft();
+  }, 160);
+}
+
+function persistNotebookDraft() {
+  if (state.notebookSaveTimer) {
+    window.clearTimeout(state.notebookSaveTimer);
+    state.notebookSaveTimer = 0;
+  }
+
+  if (!elements.notebookTextarea) {
+    return;
+  }
+
+  localStorage.setItem(NOTEBOOK_CONTENT_KEY, elements.notebookTextarea.value);
+}
+
+function restoreNotebookDraft() {
+  if (!elements.notebookTextarea) {
+    return;
+  }
+
+  elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
 }
 
 function getUploadQueueKey(file) {

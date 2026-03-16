@@ -13,6 +13,16 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <button class="notebook-corner-button" id="openNotebookMode" type="button" aria-label="開啟筆記本模式">
+      <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+        <path d="M8 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8" />
+        <path d="M8 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
+        <path d="M10 8h6" />
+        <path d="M10 12h6" />
+        <path d="M10 16h4" />
+      </svg>
+    </button>
+
     <main class="desktop-shell">
       <section class="workspace-stack">
         <section class="workspace-row">
@@ -233,6 +243,29 @@
             <button type="button" class="solid-button upload-text-button" id="saveEditor">儲存</button>
           </div>
         </aside>
+      </section>
+    </div>
+
+    <div class="notebook-mode" id="notebookMode" aria-hidden="true">
+      <section class="notebook-shell" role="dialog" aria-modal="true" aria-label="筆記本模式">
+        <div class="notebook-toolbar">
+          <div class="notebook-chip">Notebook</div>
+          <button type="button" class="notebook-close-button" id="closeNotebookMode" aria-label="關閉筆記本模式">
+            <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+              <path d="M6 6l12 12" />
+              <path d="M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="notebook-page">
+          <textarea
+            id="notebookTextarea"
+            class="notebook-textarea"
+            spellcheck="false"
+            placeholder="在這裡打字"
+          ></textarea>
+        </div>
       </section>
     </div>
 
