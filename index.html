@@ -32,7 +32,7 @@
           </section>
 
           <aside class="sidebar-tools">
-            <section class="desktop-grid" aria-label="操作按鈕">
+            <section class="desktop-grid" aria-label="操作">
               <button class="desktop-action desktop-action-primary" id="uploadTrigger" type="button">
                 <span class="icon-surface" aria-hidden="true">
                   <svg viewBox="0 0 120 120" class="line-icon upload-icon">
@@ -249,14 +249,6 @@
     <div class="notebook-mode" id="notebookMode" aria-hidden="true">
       <section class="notebook-shell" role="dialog" aria-modal="true" aria-label="Notebook">
         <div class="notebook-toolbar">
-          <div class="notebook-toolbar-copy">
-            <div class="notebook-chip">Workspace</div>
-            <div class="notebook-heading">
-              <h2>Notebook</h2>
-              <p>寫筆記，或切到 To-Do List 直接新增事項。</p>
-            </div>
-          </div>
-
           <div class="notebook-toolbar-actions">
             <div class="notebook-mode-switch" role="tablist" aria-label="筆記模式切換">
               <button type="button" class="notebook-switch-button active" id="showNotebookNotes" role="tab" aria-selected="true">
@@ -278,11 +270,6 @@
 
         <div class="notebook-stage">
           <section class="notebook-panel notebook-panel-notes active" id="notebookNotesPanel" role="tabpanel" aria-labelledby="showNotebookNotes">
-            <div class="notebook-panel-head">
-              <strong>自由筆記</strong>
-              <span>這裡就是純文字區。</span>
-            </div>
-
             <textarea
               id="notebookTextarea"
               class="notebook-textarea"
@@ -306,7 +293,6 @@
                   </span>
                 </div>
               </div>
-              <span>輸入一行內容，按新增就會進清單。</span>
             </div>
 
             <form class="todo-composer" id="todoForm">
