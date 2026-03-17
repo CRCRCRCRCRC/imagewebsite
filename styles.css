@@ -534,6 +534,7 @@ body::selection {
   grid-template-rows: auto auto minmax(0, 1fr);
   align-content: stretch;
   overflow: visible;
+  min-height: max(100%, calc(100vh - 150px));
 }
 
 .todo-composer {
@@ -597,7 +598,7 @@ body::selection {
 }
 
 .todo-list {
-  min-height: 0;
+  min-height: clamp(420px, 58vh, 820px);
   display: grid;
   align-content: start;
   gap: 12px;
@@ -1655,9 +1656,17 @@ body::selection {
     border-radius: 24px;
   }
 
+  .notebook-panel-todo {
+    min-height: max(100%, calc(100vh - 180px));
+  }
+
   .notebook-panel-notes {
     padding: 18px 18px 18px 66px;
     background-size: 100% 44px, 100% 100%, auto;
+  }
+
+  .todo-list {
+    min-height: clamp(360px, 52vh, 680px);
   }
 
   .notebook-textarea {
@@ -1753,6 +1762,10 @@ body::selection {
     border-radius: 18px;
   }
 
+  .notebook-panel-todo {
+    min-height: max(100%, calc(100vh - 150px));
+  }
+
   .notebook-panel-notes {
     padding: 14px 14px 14px 44px;
     background-size: 100% 38px, 100% 100%, auto;
@@ -1773,6 +1786,10 @@ body::selection {
 
   .todo-item {
     grid-template-columns: auto minmax(0, 1fr) 96px auto;
+  }
+
+  .todo-list {
+    min-height: clamp(320px, 48vh, 560px);
   }
 
   .notebook-textarea {
