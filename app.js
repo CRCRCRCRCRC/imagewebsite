@@ -91,6 +91,9 @@ const state = {
   uploadQueue: [],
   editor: createEditorStateV2(),
   notebookSaveTimer: 0,
+  notebookSyncTimer: 0,
+  isNotebookSyncing: false,
+  isNotebookSyncQueued: false,
   notebookView: "notes",
   notebookTodos: [],
 };
@@ -112,13 +115,19 @@ async function init() {
   } finally {
     setBusy(false);
   }
+
+  try {
+    await syncNotebookStateFromServerV4();
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function bindEvents() {
   elements.openNotebookMode?.addEventListener("click", openNotebookMode);
   elements.closeNotebookMode?.addEventListener("click", closeNotebookMode);
   elements.notebookTextarea?.addEventListener("input", handleNotebookInput);
-  elements.notebookTextarea?.addEventListener("blur", persistNotebookDraft);
+  elements.notebookTextarea?.addEventListener("blur", handleNotebookBlurV4);
   elements.showNotebookNotes?.addEventListener("click", () => setNotebookView("notes"));
   elements.showNotebookTodo?.addEventListener("click", () => setNotebookView("todo"));
   elements.todoForm?.addEventListener("submit", handleTodoSubmit);
@@ -226,8 +235,7 @@ function bindEvents() {
 
   document.addEventListener("paste", handleUploadPaste);
   window.addEventListener("resize", handleEditorViewportChangeV2);
-  window.addEventListener("pagehide", persistNotebookDraft);
-  window.addEventListener("pagehide", persistNotebookTodos);
+  window.addEventListener("pagehide", flushNotebookSyncV4);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isNotebookOpen()) {
@@ -261,6 +269,7 @@ function openNotebookMode() {
   elements.notebookMode?.classList.add("open");
   elements.notebookMode?.setAttribute("aria-hidden", "false");
   document.body.classList.add("notebook-open");
+  void syncNotebookStateFromServerV4({ silent: true });
   requestAnimationFrame(() => {
     if (state.notebookView === "todo") {
       elements.todoInput?.focus();
@@ -274,6 +283,7 @@ function openNotebookMode() {
 function closeNotebookMode() {
   persistNotebookDraft();
   persistNotebookTodos();
+  void syncNotebookStateToServerV4({ immediate: true, silent: true });
   elements.notebookMode?.classList.remove("open");
   elements.notebookMode?.setAttribute("aria-hidden", "true");
   document.body.classList.remove("notebook-open");
@@ -1123,6 +1133,7 @@ function handleNotebookInput() {
 
   state.notebookSaveTimer = window.setTimeout(() => {
     persistNotebookDraft();
+    queueNotebookSyncV4();
   }, 160);
 }
 
@@ -1137,6 +1148,11 @@ function persistNotebookDraft() {
   }
 
   localStorage.setItem(NOTEBOOK_CONTENT_KEY, elements.notebookTextarea.value);
+}
+
+function handleNotebookBlurV4() {
+  persistNotebookDraft();
+  queueNotebookSyncV4({ immediate: true });
 }
 
 function persistNotebookTodos() {
@@ -1198,7 +1214,7 @@ function renderNotebookView() {
     elements.notebookTodoPanel.classList.toggle("active", showTodo);
   }
 
-  renderTodoListV3();
+  renderTodoListV4();
 }
 
 function handleTodoSubmit(event) {
@@ -1230,10 +1246,17 @@ function handleTodoSubmit(event) {
   }
 
   persistNotebookTodos();
-  renderTodoListV3();
+  queueNotebookSyncV4();
+  renderTodoListV4();
 }
 
 function handleTodoListClick(event) {
+  const editButton = event.target.closest("[data-edit-todo]");
+  if (editButton) {
+    handleTodoEditV4(editButton.getAttribute("data-edit-todo"));
+    return;
+  }
+
   const deleteButton = event.target.closest("[data-delete-todo]");
   if (!deleteButton) {
     return;
@@ -1242,7 +1265,8 @@ function handleTodoListClick(event) {
   const todoId = deleteButton.getAttribute("data-delete-todo");
   state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
   persistNotebookTodos();
-  renderTodoListV3();
+  queueNotebookSyncV4();
+  renderTodoListV4();
 }
 
 function handleTodoListChange(event) {
@@ -1262,7 +1286,8 @@ function handleTodoListChange(event) {
   );
 
   persistNotebookTodos();
-  renderTodoListV3();
+  queueNotebookSyncV4();
+  renderTodoListV4();
 }
 
 function renderTodoList() {
@@ -1501,6 +1526,282 @@ function getTodoNumericPriceV3(value) {
 }
 
 function formatTodoAmountV3(value) {
+  const formatter = Number.isInteger(value)
+    ? new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 })
+    : new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  return formatter.format(value);
+}
+
+async function syncNotebookStateFromServerV4({ silent = false } = {}) {
+  const response = await fetch("/api/notebook", {
+    cache: "no-store",
+  });
+  const payload = await parseJson(response);
+
+  if (!response.ok) {
+    throw new Error(payload.error || "記事本同步失敗。");
+  }
+
+  const notebook = normalizeNotebookStateV4(payload.notebook);
+  const localNotebook = buildNotebookStatePayloadV4();
+
+  if (isNotebookStateEmptyV4(notebook) && !isNotebookStateEmptyV4(localNotebook)) {
+    await syncNotebookStateToServerV4({ immediate: true, silent: true });
+    return;
+  }
+
+  applyNotebookStateV4(notebook);
+
+  if (!silent && isNotebookOpen()) {
+    setStatus("記事本已同步。");
+  }
+}
+
+function applyNotebookStateV4(notebook) {
+  const normalized = normalizeNotebookStateV4(notebook);
+  state.notebookTodos = normalized.todos;
+
+  if (elements.notebookTextarea) {
+    elements.notebookTextarea.value = normalized.content;
+  }
+
+  localStorage.setItem(NOTEBOOK_CONTENT_KEY, normalized.content);
+  localStorage.setItem(NOTEBOOK_TODOS_KEY, JSON.stringify(normalized.todos));
+  renderNotebookView();
+}
+
+function buildNotebookStatePayloadV4() {
+  return {
+    content: elements.notebookTextarea?.value || "",
+    todos: state.notebookTodos.map((item) => ({
+      id: item.id,
+      text: item.text,
+      price: normalizeTodoPrice(item.price),
+      done: Boolean(item.done),
+    })),
+  };
+}
+
+function normalizeNotebookStateV4(notebook) {
+  const source = notebook && typeof notebook === "object" ? notebook : {};
+  const todos = Array.isArray(source.todos) ? source.todos.map(normalizeStoredTodoItemV2).filter(Boolean) : [];
+
+  return {
+    content: typeof source.content === "string" ? source.content : "",
+    todos,
+  };
+}
+
+function isNotebookStateEmptyV4(notebook) {
+  return !notebook.content.trim() && notebook.todos.length === 0;
+}
+
+function queueNotebookSyncV4({ immediate = false } = {}) {
+  if (state.notebookSyncTimer) {
+    window.clearTimeout(state.notebookSyncTimer);
+    state.notebookSyncTimer = 0;
+  }
+
+  if (immediate) {
+    void syncNotebookStateToServerV4({ immediate: true, silent: true });
+    return;
+  }
+
+  state.notebookSyncTimer = window.setTimeout(() => {
+    state.notebookSyncTimer = 0;
+    void syncNotebookStateToServerV4({ silent: true });
+  }, 260);
+}
+
+async function syncNotebookStateToServerV4({ immediate = false, silent = false } = {}) {
+  if (!immediate && state.notebookSyncTimer) {
+    window.clearTimeout(state.notebookSyncTimer);
+    state.notebookSyncTimer = 0;
+  }
+
+  if (state.isNotebookSyncing) {
+    state.isNotebookSyncQueued = true;
+    return;
+  }
+
+  state.isNotebookSyncing = true;
+
+  try {
+    const response = await fetch("/api/notebook", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(buildNotebookStatePayloadV4()),
+    });
+    const payload = await parseJson(response);
+
+    if (!response.ok) {
+      throw new Error(payload.error || "記事本同步失敗。");
+    }
+
+    applyNotebookStateV4(payload.notebook);
+  } catch (error) {
+    console.error(error);
+    if (!silent) {
+      setStatus(error.message || "記事本同步失敗。", true);
+    }
+  } finally {
+    state.isNotebookSyncing = false;
+
+    if (state.isNotebookSyncQueued) {
+      state.isNotebookSyncQueued = false;
+      void syncNotebookStateToServerV4({ silent: true });
+    }
+  }
+}
+
+function flushNotebookSyncV4() {
+  persistNotebookDraft();
+  persistNotebookTodos();
+
+  if (state.notebookSyncTimer) {
+    window.clearTimeout(state.notebookSyncTimer);
+    state.notebookSyncTimer = 0;
+  }
+
+  if (typeof fetch !== "function") {
+    return;
+  }
+
+  void fetch("/api/notebook", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildNotebookStatePayloadV4()),
+    keepalive: true,
+  }).catch((error) => {
+    console.error(error);
+  });
+}
+
+function handleTodoEditV4(todoId) {
+  if (!todoId) {
+    return;
+  }
+
+  const target = state.notebookTodos.find((item) => item.id === todoId);
+  if (!target) {
+    return;
+  }
+
+  const nextText = window.prompt("編輯項目", target.text);
+  if (nextText === null) {
+    return;
+  }
+
+  const normalizedText = nextText.trim();
+  if (!normalizedText) {
+    setStatus("待辦項目不能是空的。", true);
+    return;
+  }
+
+  const nextPrice = window.prompt("編輯價格", target.price || "");
+  if (nextPrice === null) {
+    return;
+  }
+
+  state.notebookTodos = state.notebookTodos.map((item) =>
+    item.id === todoId
+      ? {
+          ...item,
+          text: normalizedText,
+          price: normalizeTodoPrice(nextPrice),
+        }
+      : item,
+  );
+
+  persistNotebookTodos();
+  queueNotebookSyncV4();
+  renderTodoListV4();
+}
+
+function renderTodoListV4() {
+  if (!elements.todoList) {
+    return;
+  }
+
+  renderTodoSummaryV4();
+  elements.todoList.innerHTML = "";
+
+  if (state.notebookTodos.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "todo-empty";
+    emptyState.textContent = "還沒有待辦事項。";
+    elements.todoList.append(emptyState);
+    return;
+  }
+
+  state.notebookTodos.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `todo-item${item.done ? " done" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "todo-item-checkbox";
+    checkbox.checked = item.done;
+    checkbox.setAttribute("data-toggle-todo", item.id);
+    checkbox.setAttribute("aria-label", `切換 ${item.text}`);
+
+    const label = document.createElement("span");
+    label.className = "todo-item-label";
+    label.textContent = item.text;
+
+    const price = document.createElement("span");
+    price.className = "todo-item-price";
+    price.textContent = item.price || "-";
+
+    const actions = document.createElement("div");
+    actions.className = "todo-item-actions";
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "todo-item-edit";
+    editButton.setAttribute("data-edit-todo", item.id);
+    editButton.setAttribute("aria-label", `編輯 ${item.text}`);
+    editButton.textContent = "編輯";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "todo-item-delete";
+    deleteButton.setAttribute("data-delete-todo", item.id);
+    deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
+    deleteButton.textContent = "×";
+
+    actions.append(editButton, deleteButton);
+    row.append(checkbox, label, price, actions);
+    elements.todoList.append(row);
+  });
+}
+
+function renderTodoSummaryV4() {
+  const totalAmount = state.notebookTodos.reduce((sum, item) => sum + getTodoNumericPriceV4(item.price), 0);
+  const openAmount = state.notebookTodos.reduce(
+    (sum, item) => sum + (item.done ? 0 : getTodoNumericPriceV4(item.price)),
+    0,
+  );
+
+  updateText(elements.todoTotalAmount, formatTodoAmountV4(totalAmount));
+  updateText(elements.todoOpenAmount, formatTodoAmountV4(openAmount));
+}
+
+function getTodoNumericPriceV4(value) {
+  const normalized = String(value || "")
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "");
+  const amount = Number(normalized);
+
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function formatTodoAmountV4(value) {
   const formatter = Number.isInteger(value)
     ? new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 0 })
     : new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 2 });

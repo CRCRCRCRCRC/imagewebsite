@@ -656,25 +656,54 @@ body::selection {
   color: rgba(15, 26, 43, 0.4);
 }
 
+.todo-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-item-edit,
 .todo-item-delete {
-  width: 38px;
   height: 38px;
+  padding: 0 12px;
   border: 0;
   border-radius: 12px;
   background: rgba(15, 26, 43, 0.06);
   color: rgba(15, 26, 43, 0.72);
   font: inherit;
-  font-size: 1rem;
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 0.86rem;
+  font-weight: 700;
   cursor: pointer;
   transition:
     background var(--ease-smooth),
     transform var(--ease-smooth);
 }
 
+.todo-item-delete {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 1rem;
+}
+
+.todo-item-edit:hover,
+.todo-item-edit:focus-visible,
 .todo-item-delete:hover,
 .todo-item-delete:focus-visible {
   transform: translateY(-1px);
   background: rgba(15, 26, 43, 0.1);
+}
+
+.todo-item-edit:focus-visible,
+.todo-item-delete:focus-visible {
+  outline: 2px solid rgba(15, 26, 43, 0.12);
+  outline-offset: 2px;
+}
+
+.todo-item-delete {
+  border: 0;
+  padding: 0;
 }
 
 .todo-empty {
