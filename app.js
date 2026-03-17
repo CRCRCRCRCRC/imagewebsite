@@ -202,6 +202,12 @@ function bindEvents() {
   elements.editorCanvas?.addEventListener("gesturechange", blockEditorGestureV2);
   elements.editorCanvas?.addEventListener("gestureend", blockEditorGestureV2);
   elements.editorCanvas?.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
+  elements.imageEditor?.addEventListener("touchstart", blockEditorGestureV2, { passive: false });
+  elements.imageEditor?.addEventListener("touchmove", blockEditorGestureV2, { passive: false });
+  elements.imageEditor?.addEventListener("gesturestart", blockEditorGestureV2);
+  elements.imageEditor?.addEventListener("gesturechange", blockEditorGestureV2);
+  elements.imageEditor?.addEventListener("gestureend", blockEditorGestureV2);
+  elements.imageEditor?.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
 
   elements.folderModal?.addEventListener("click", (event) => {
     if (event.target === elements.folderModal) {
@@ -235,6 +241,10 @@ function bindEvents() {
 
   document.addEventListener("paste", handleUploadPaste);
   window.addEventListener("resize", handleEditorViewportChangeV2);
+  window.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
+  window.addEventListener("gesturestart", blockEditorGestureV2);
+  window.addEventListener("gesturechange", blockEditorGestureV2);
+  window.addEventListener("gestureend", blockEditorGestureV2);
   window.addEventListener("pagehide", flushNotebookSyncV4);
 
   document.addEventListener("keydown", (event) => {
@@ -382,6 +392,11 @@ function closeImageViewer() {
 
 function isImageEditorOpen() {
   return elements.imageEditor?.classList.contains("open");
+}
+
+function setEditorViewportLockV2(isLocked) {
+  document.documentElement.classList.toggle("editor-viewport-locked", isLocked);
+  document.body.classList.toggle("editor-viewport-locked", isLocked);
 }
 
 async function openImageEditor() {
@@ -2612,6 +2627,7 @@ async function openImageEditorV2() {
     syncEditorControlsV2();
     elements.imageEditor?.classList.add("open");
     elements.imageEditor?.setAttribute("aria-hidden", "false");
+    setEditorViewportLockV2(true);
     requestAnimationFrame(() => {
       scheduleRenderImageEditorV2();
       elements.editorCanvas?.focus();
@@ -2635,6 +2651,7 @@ function closeImageEditorV2({ force = false } = {}) {
 
   elements.imageEditor?.classList.remove("open");
   elements.imageEditor?.setAttribute("aria-hidden", "true");
+  setEditorViewportLockV2(false);
   state.editor = createEditorStateV2();
   syncEditorControlsV2();
 
@@ -2731,14 +2748,21 @@ function blockEditorGestureV2(event) {
   }
 
   event.preventDefault();
+  event.stopPropagation();
 }
 
 function handleEditorWheelZoomV2(event) {
-  if (!isImageEditorOpen() || !event.ctrlKey) {
+  if (!isImageEditorOpen()) {
     return;
   }
 
-  event.preventDefault();
+  const target = event.target instanceof Node ? event.target : null;
+  const isInsideEditor = Boolean(target && elements.imageEditor?.contains(target));
+
+  if (isInsideEditor || event.ctrlKey || event.metaKey) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 }
 
 function renderImageEditorV2() {
@@ -2814,6 +2838,7 @@ function handleEditorPointerDownV2(event) {
   }
 
   event.preventDefault();
+  event.stopPropagation();
 
   const point = getEditorCanvasPoint(event);
   if (!point) {
@@ -2848,6 +2873,7 @@ function handleEditorPointerMoveV2(event) {
   }
 
   event.preventDefault();
+  event.stopPropagation();
 
   const point = getEditorCanvasPoint(event);
   if (!point) {
@@ -2885,6 +2911,7 @@ function handleEditorPointerUpV2(event) {
   }
 
   event.preventDefault();
+  event.stopPropagation();
 
   if (elements.editorCanvas?.hasPointerCapture?.(event.pointerId)) {
     elements.editorCanvas.releasePointerCapture(event.pointerId);
