@@ -960,39 +960,124 @@ body::selection {
   gap: 10px;
 }
 
+.upload-progress-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.upload-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2b67bc 0%, #6fa5f0 100%);
+  transition: width 180ms ease;
+}
+
 .upload-queue-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 10px;
 }
 
-.upload-queue-chip {
-  border: 0;
-  max-width: 100%;
-  padding: 11px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.54);
-  color: var(--ink);
-  font: inherit;
+.upload-queue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.upload-queue-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.upload-queue-name,
+.upload-queue-size,
+.upload-queue-badge,
+.upload-queue-remove {
   font-family: "Noto Sans TC", sans-serif;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
+}
+
+.upload-queue-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
-  transition:
-    transform var(--ease-smooth),
-    background var(--ease-smooth),
-    box-shadow var(--ease-smooth);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
-.upload-queue-chip:hover,
-.upload-queue-chip:focus-visible {
-  transform: translateY(-2px);
+.upload-queue-size {
+  color: rgba(15, 26, 43, 0.58);
+  font-size: 0.78rem;
+}
+
+.upload-queue-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.upload-queue-badge-queued {
+  background: rgba(15, 26, 43, 0.08);
+  color: rgba(15, 26, 43, 0.72);
+}
+
+.upload-queue-badge-uploading {
+  background: rgba(43, 103, 188, 0.14);
+  color: #204f96;
+}
+
+.upload-queue-badge-done {
+  background: rgba(41, 145, 88, 0.14);
+  color: #1c7245;
+}
+
+.upload-queue-badge-error {
+  background: rgba(204, 64, 64, 0.14);
+  color: #a33636;
+}
+
+.upload-queue-remove {
+  border: 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--ease-smooth),
+    color var(--ease-smooth),
+    transform var(--ease-smooth);
+}
+
+.upload-queue-remove:hover,
+.upload-queue-remove:focus-visible {
+  transform: translateY(-1px);
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 12px 24px rgba(18, 48, 94, 0.12);
+  color: var(--ink);
+}
+
+.upload-queue-remove:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
 }
 
 .upload-modal-actions {

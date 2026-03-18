@@ -1,4 +1,5 @@
 const MAX_FILE_SIZE = Math.floor(4.5 * 1024 * 1024);
+const MAX_PARALLEL_UPLOADS = 3;
 const EDITOR_DEFAULT_COLOR = "#0f1a2b";
 const EDITOR_DEFAULT_BRUSH = 8;
 const EDITOR_HISTORY_LIMIT = 12;
@@ -89,6 +90,13 @@ const state = {
   isBusy: false,
   activePreview: null,
   uploadQueue: [],
+  uploadQueueStatus: {},
+  uploadProgress: {
+    active: false,
+    total: 0,
+    completed: 0,
+    failed: 0,
+  },
   editor: createEditorStateV2(),
   notebookSaveTimer: 0,
   notebookSyncTimer: 0,
@@ -327,6 +335,7 @@ function closeUploadModal({ clearQueue = true, force = false } = {}) {
 
   if (clearQueue) {
     state.uploadQueue = [];
+    resetUploadProgress();
     renderUploadQueue();
   }
 }
@@ -1103,6 +1112,9 @@ function addFilesToUploadQueue(files) {
   });
 
   if (accepted.length > 0) {
+    accepted.forEach((file) => {
+      setUploadQueueFileStatus(file, "queued");
+    });
     state.uploadQueue = [...state.uploadQueue, ...accepted];
     renderUploadQueue();
   }
@@ -1828,15 +1840,52 @@ function getUploadQueueKey(file) {
   return [file.name, file.size, file.lastModified].join("::");
 }
 
+function setUploadQueueFileStatus(file, status) {
+  state.uploadQueueStatus[getUploadQueueKey(file)] = status;
+}
+
+function getUploadQueueFileStatus(file) {
+  return state.uploadQueueStatus[getUploadQueueKey(file)] || "queued";
+}
+
+function resetUploadProgress() {
+  state.uploadQueueStatus = {};
+  state.uploadProgress = {
+    active: false,
+    total: 0,
+    completed: 0,
+    failed: 0,
+  };
+}
+
+function formatUploadFileSize(size) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return "";
+  }
+
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (size >= 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${size} B`;
+}
+
 function renderUploadQueue() {
   if (!elements.uploadQueue || !elements.submitUploadQueue) {
     return;
   }
 
   const files = state.uploadQueue;
+  const { active, total, completed, failed } = state.uploadProgress;
   elements.uploadQueue.hidden = files.length === 0;
   elements.submitUploadQueue.disabled = files.length === 0 || state.isBusy;
   elements.submitUploadQueue.setAttribute("aria-disabled", String(files.length === 0 || state.isBusy));
+  elements.submitUploadQueue.textContent =
+    active && total > 0 ? `上傳中 ${completed}/${total}` : "開始上傳";
 
   elements.uploadQueue.innerHTML = "";
   if (files.length === 0) {
@@ -1845,27 +1894,82 @@ function renderUploadQueue() {
 
   const summary = document.createElement("p");
   summary.className = "upload-queue-summary";
-  summary.textContent = `已加入 ${files.length} 張圖片`;
+  if (active && total > 0) {
+    summary.textContent = `正在上傳 ${completed}/${total} 張圖片`;
+  } else if (completed > 0 || failed > 0) {
+    summary.textContent = `已完成 ${completed}/${files.length} 張${failed > 0 ? `，${failed} 張失敗` : ""}`;
+  } else {
+    summary.textContent = `已加入 ${files.length} 張圖片`;
+  }
   elements.uploadQueue.append(summary);
+
+  const progressTrack = document.createElement("div");
+  progressTrack.className = "upload-progress-track";
+  const progressFill = document.createElement("span");
+  progressFill.className = "upload-progress-fill";
+  progressFill.style.width = `${total > 0 ? (completed / total) * 100 : 0}%`;
+  progressTrack.append(progressFill);
+  elements.uploadQueue.append(progressTrack);
 
   const list = document.createElement("div");
   list.className = "upload-queue-list";
 
   files.forEach((file, index) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "upload-queue-chip";
-    chip.textContent = file.name;
-    chip.title = `移除 ${file.name}`;
-    chip.addEventListener("click", () => removeUploadQueueFile(index));
-    list.append(chip);
+    const status = getUploadQueueFileStatus(file);
+    const row = document.createElement("div");
+    row.className = `upload-queue-row upload-queue-row-${status}`;
+
+    const meta = document.createElement("div");
+    meta.className = "upload-queue-meta";
+
+    const name = document.createElement("strong");
+    name.className = "upload-queue-name";
+    name.textContent = file.name;
+    name.title = file.name;
+
+    const detail = document.createElement("span");
+    detail.className = "upload-queue-size";
+    detail.textContent = formatUploadFileSize(file.size);
+
+    const badge = document.createElement("span");
+    badge.className = `upload-queue-badge upload-queue-badge-${status}`;
+    badge.textContent =
+      status === "uploading"
+        ? "上傳中"
+        : status === "done"
+          ? "完成"
+          : status === "error"
+            ? "失敗"
+            : "等待";
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "upload-queue-remove";
+    removeButton.textContent = "移除";
+    removeButton.title = `移除 ${file.name}`;
+    removeButton.disabled = state.isBusy;
+    removeButton.addEventListener("click", () => removeUploadQueueFile(index));
+
+    meta.append(name, detail);
+    row.append(meta, badge, removeButton);
+    list.append(row);
   });
 
   elements.uploadQueue.append(list);
 }
 
 function removeUploadQueueFile(index) {
+  const removedFile = state.uploadQueue[index];
+  if (removedFile) {
+    delete state.uploadQueueStatus[getUploadQueueKey(removedFile)];
+  }
+
   state.uploadQueue = state.uploadQueue.filter((_, queuedIndex) => queuedIndex !== index);
+
+  if (state.uploadQueue.length === 0) {
+    resetUploadProgress();
+  }
+
   renderUploadQueue();
 }
 
@@ -1887,17 +1991,24 @@ async function handleUploadQueueSubmit() {
 
   try {
     setBusy(true);
+    const result = await uploadFilesInParallel(state.uploadQueue, targetFolder.id);
+    applyUploadedImages(result.images);
 
-    let completed = 0;
-    for (const file of state.uploadQueue) {
-      completed += 1;
-      setStatus(`上傳圖片 ${completed}/${state.uploadQueue.length}`);
-      await uploadSingleFile(file, targetFolder.id);
+    if (result.failedCount > 0) {
+      setStatus(
+        result.images.length > 0
+          ? `已上傳 ${result.images.length} 張，${result.failedCount} 張失敗。`
+          : result.errorMessage || "上傳失敗。",
+        result.images.length === 0,
+      );
+      return;
     }
 
-    await refreshLibrary(state.selectedFolderId);
-    setStatus(`已上傳 ${state.uploadQueue.length} 張圖片。`);
+    setStatus(`已上傳 ${result.images.length} 張圖片。`);
     closeUploadModal({ force: true });
+    void refreshLibrary(state.selectedFolderId).catch((error) => {
+      console.error(error);
+    });
   } catch (error) {
     console.error(error);
     setStatus(error.message || "上傳失敗。", true);
@@ -1944,16 +2055,23 @@ async function handleUpload(event) {
 
   try {
     setBusy(true);
+    const result = await uploadFilesInParallel(files, targetFolder.id);
+    applyUploadedImages(result.images);
 
-    let completed = 0;
-    for (const file of files) {
-      completed += 1;
-      setStatus(`上傳中 ${completed}/${files.length}`);
-      await uploadSingleFile(file, targetFolder.id);
+    if (result.failedCount > 0) {
+      setStatus(
+        result.images.length > 0
+          ? `已上傳 ${result.images.length} 張，${result.failedCount} 張失敗。`
+          : result.errorMessage || "上傳失敗。",
+        result.images.length === 0,
+      );
+      return;
     }
 
-    await refreshLibrary(state.selectedFolderId);
-    setStatus(`已上傳 ${files.length} 張圖片。`);
+    setStatus(`已上傳 ${result.images.length} 張圖片。`);
+    void refreshLibrary(state.selectedFolderId).catch((error) => {
+      console.error(error);
+    });
   } catch (error) {
     console.error(error);
     setStatus(error.message || "上傳失敗。", true);
@@ -1998,6 +2116,81 @@ async function uploadSingleFile(file, folderId) {
   if (!response.ok) {
     throw new Error(payload.error || "上傳失敗。");
   }
+
+  return payload.image || null;
+}
+
+async function uploadFilesInParallel(files, folderId) {
+  const uploadedImages = [];
+  let nextIndex = 0;
+  let completed = 0;
+  let failedCount = 0;
+  let errorMessage = "";
+
+  state.uploadProgress = {
+    active: true,
+    total: files.length,
+    completed: 0,
+    failed: 0,
+  };
+
+  files.forEach((file) => {
+    setUploadQueueFileStatus(file, "queued");
+  });
+  renderUploadQueue();
+
+  const workerCount = Math.min(MAX_PARALLEL_UPLOADS, files.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < files.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      const file = files[currentIndex];
+      setUploadQueueFileStatus(file, "uploading");
+      renderUploadQueue();
+
+      try {
+        const image = await uploadSingleFile(file, folderId);
+        if (image) {
+          uploadedImages.push(image);
+        }
+        setUploadQueueFileStatus(file, "done");
+      } catch (error) {
+        failedCount += 1;
+        errorMessage ||= error.message || "上傳失敗。";
+        setUploadQueueFileStatus(file, "error");
+      }
+
+      completed += 1;
+      state.uploadProgress.completed = completed;
+      state.uploadProgress.failed = failedCount;
+      renderUploadQueue();
+      setStatus(`上傳圖片 ${completed}/${files.length}`);
+    }
+  });
+
+  await Promise.all(workers);
+  state.uploadProgress.active = false;
+  renderUploadQueue();
+
+  return {
+    images: uploadedImages,
+    failedCount,
+    errorMessage,
+  };
+}
+
+function applyUploadedImages(images) {
+  if (!Array.isArray(images) || images.length === 0) {
+    return;
+  }
+
+  const uploadedIds = new Set(images.map((image) => image.id).filter(Boolean));
+  state.images = [...images, ...state.images.filter((image) => !uploadedIds.has(image.id))].sort(
+    (left, right) => new Date(right.uploadedAt).getTime() - new Date(left.uploadedAt).getTime(),
+  );
+  syncFolderImageCounts();
+  saveLibraryCache();
+  render();
 }
 
 function render() {
