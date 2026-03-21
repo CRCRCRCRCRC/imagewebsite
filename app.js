@@ -1290,6 +1290,15 @@ function handleTodoListClick(event) {
   }
 
   const todoId = deleteButton.getAttribute("data-delete-todo");
+  const targetTodo = state.notebookTodos.find((item) => item.id === todoId);
+  if (!targetTodo) {
+    return;
+  }
+
+  if (!window.confirm(`刪除「${targetTodo.text}」？`)) {
+    return;
+  }
+
   state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
   persistNotebookTodos();
   queueNotebookSyncV4();
@@ -1356,7 +1365,7 @@ function renderTodoList() {
     deleteButton.className = "todo-item-delete";
     deleteButton.setAttribute("data-delete-todo", item.id);
     deleteButton.setAttribute("aria-label", `刪除 ${item.text}`);
-    deleteButton.textContent = "×";
+    deleteButton.textContent = "刪除";
 
     row.append(checkbox, label, price, deleteButton);
     elements.todoList?.append(row);
