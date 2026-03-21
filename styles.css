@@ -506,7 +506,7 @@ body::selection {
   grid-template-rows: auto auto minmax(0, 1fr);
   align-content: stretch;
   overflow: visible;
-  min-height: max(100%, calc(100vh - 150px));
+  min-height: max(100%, calc(100vh - 112px));
 }
 
 .todo-composer {
@@ -570,10 +570,10 @@ body::selection {
 }
 
 .todo-list {
-  min-height: clamp(420px, 58vh, 820px);
+  min-height: clamp(520px, 68vh, 960px);
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 10px;
   padding-top: 2px;
   padding-right: 8px;
   padding-bottom: 8px;
@@ -586,8 +586,8 @@ body::selection {
   grid-template-columns: auto minmax(0, 1fr) 128px auto;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 10px 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(188, 204, 230, 0.38);
   box-shadow: 0 12px 24px rgba(18, 48, 94, 0.06);
@@ -604,8 +604,8 @@ body::selection {
   min-width: 0;
   color: var(--ink);
   font-family: "Noto Sans TC", sans-serif;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.93rem;
+  line-height: 1.35;
   word-break: break-word;
 }
 
@@ -613,7 +613,7 @@ body::selection {
   min-width: 0;
   color: rgba(15, 26, 43, 0.72);
   font-family: "Space Grotesk", "Noto Sans TC", sans-serif;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -631,20 +631,20 @@ body::selection {
 .todo-item-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .todo-item-edit,
 .todo-item-delete {
-  height: 38px;
-  padding: 0 12px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(15, 26, 43, 0.06);
   color: rgba(15, 26, 43, 0.72);
   font: inherit;
   font-family: "Noto Sans TC", sans-serif;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -653,10 +653,10 @@ body::selection {
 }
 
 .todo-item-delete {
-  min-width: 56px;
-  height: 38px;
-  padding: 0 12px;
-  font-size: 0.84rem;
+  min-width: 52px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 0.8rem;
   background: rgba(196, 46, 46, 0.12);
   color: #9f2f2f;
 }
@@ -677,7 +677,7 @@ body::selection {
 
 .todo-item-delete {
   border: 0;
-  padding: 0 12px;
+  padding: 0 10px;
 }
 
 .todo-empty {
