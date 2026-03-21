@@ -119,7 +119,7 @@ body::selection {
 .gallery-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
   width: 100%;
 }
@@ -131,7 +131,7 @@ body::selection {
   flex: 0 0 auto;
   justify-items: center;
   align-items: start;
-  gap: 12px;
+  gap: 8px;
   width: fit-content;
   height: auto;
   padding: 0;
@@ -151,9 +151,9 @@ body::selection {
   justify-content: center;
   width: fit-content;
   max-width: min(720px, calc(100vw - 120px));
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 28px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
@@ -169,7 +169,7 @@ body::selection {
   max-width: min(720px, calc(100vw - 148px));
   max-height: none;
   object-fit: contain;
-  border-radius: 20px;
+  border-radius: 15px;
   pointer-events: none;
 }
 
@@ -177,7 +177,7 @@ body::selection {
   display: block;
   width: fit-content;
   max-width: min(720px, calc(100vw - 120px));
-  padding-top: 12px;
+  padding-top: 8px;
   overflow: hidden;
   color: var(--ink);
   font-family: "Noto Sans TC", sans-serif;
@@ -1705,7 +1705,7 @@ body::selection {
   }
 
   .gallery-item {
-    gap: 10px;
+    gap: 8px;
   }
 
   .gallery-media {
@@ -1777,12 +1777,12 @@ body::selection {
   }
 
   .gallery-item {
-    gap: 8px;
+    gap: 6px;
     max-width: 100%;
   }
 
   .gallery-media {
-    padding: 12px;
+    padding: 7px;
     max-width: calc(100vw - 48px);
   }
 
