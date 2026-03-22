@@ -17,6 +17,7 @@ const LEGACY_NOTEBOOK_TODO_KEYS = [
   "image-space-todos",
 ];
 const LIBRARY_AUTO_REFRESH_MS = 15000;
+const LIBRARY_REFRESH_PAUSE_MS = 6000;
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
@@ -109,6 +110,7 @@ const state = {
 
 let libraryAutoRefreshTimer = 0;
 let libraryRefreshPromise = null;
+let libraryRefreshPausedUntil = 0;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -347,6 +349,7 @@ function handleLibraryFocus() {
 function shouldSkipSilentLibraryRefresh() {
   return (
     state.isBusy ||
+    Date.now() < libraryRefreshPausedUntil ||
     document.hidden ||
     isUploadModalOpen() ||
     isNotebookOpen() ||
@@ -354,6 +357,10 @@ function shouldSkipSilentLibraryRefresh() {
     isImageEditorOpen() ||
     elements.folderModal?.classList.contains("open")
   );
+}
+
+function pauseLibraryAutoRefresh(durationMs = LIBRARY_REFRESH_PAUSE_MS) {
+  libraryRefreshPausedUntil = Math.max(libraryRefreshPausedUntil, Date.now() + durationMs);
 }
 
 async function refreshLibrarySilently() {
@@ -2601,6 +2608,7 @@ async function handleRenamePreviewFast() {
     return;
   }
 
+  pauseLibraryAutoRefresh();
   const imageId = state.activePreview.id;
   const previousName = state.activePreview.name || "";
   const nextName = window.prompt("重新命名圖片", previousName);
@@ -2619,6 +2627,7 @@ async function handleRenamePreviewFast() {
   }
 
   try {
+    pauseLibraryAutoRefresh();
     setViewerBusy(true);
     applyRenamedImage(imageId, normalizedName);
 
@@ -2658,6 +2667,7 @@ async function handleRenamePreview() {
     return;
   }
 
+  pauseLibraryAutoRefresh();
   const nextName = window.prompt("輸入圖片名稱", state.activePreview.name || "");
   if (nextName === null) {
     return;
@@ -2670,6 +2680,7 @@ async function handleRenamePreview() {
   }
 
   try {
+    pauseLibraryAutoRefresh();
     setViewerBusy(true);
 
     const response = await fetch("/api/images", {
@@ -2705,12 +2716,14 @@ async function handleDeletePreview() {
 
   const image = state.activePreview;
   const imageLabel = image.name || "這張圖片";
+  pauseLibraryAutoRefresh();
   const confirmed = window.confirm(`確定要刪除「${imageLabel}」嗎？這個動作不能復原。`);
   if (!confirmed) {
     return;
   }
 
   try {
+    pauseLibraryAutoRefresh();
     setViewerBusy(true);
 
     const response = await fetch("/api/images", {
