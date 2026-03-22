@@ -16,6 +16,7 @@ const LEGACY_NOTEBOOK_TODO_KEYS = [
   "image-space-notebook-todo-list",
   "image-space-todos",
 ];
+const LIBRARY_AUTO_REFRESH_MS = 15000;
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
@@ -106,10 +107,14 @@ const state = {
   notebookTodos: [],
 };
 
+let libraryAutoRefreshTimer = 0;
+let libraryRefreshPromise = null;
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
+  startLibraryAutoRefresh();
   restoreNotebookStateV2();
   restoreLibraryCache();
   setBusy(true);
@@ -248,7 +253,9 @@ function bindEvents() {
   });
 
   document.addEventListener("paste", handleUploadPaste);
+  document.addEventListener("visibilitychange", handleLibraryVisibilityChange);
   window.addEventListener("resize", handleEditorViewportChangeV2);
+  window.addEventListener("focus", handleLibraryFocus);
   window.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
   window.addEventListener("gesturestart", blockEditorGestureV2);
   window.addEventListener("gesturechange", blockEditorGestureV2);
@@ -311,6 +318,62 @@ function openFolderModal() {
   elements.folderModal?.classList.add("open");
   elements.folderModal?.setAttribute("aria-hidden", "false");
   requestAnimationFrame(() => elements.folderNameInput?.focus());
+}
+
+function startLibraryAutoRefresh() {
+  stopLibraryAutoRefresh();
+  libraryAutoRefreshTimer = window.setInterval(() => {
+    void refreshLibrarySilently();
+  }, LIBRARY_AUTO_REFRESH_MS);
+}
+
+function stopLibraryAutoRefresh() {
+  if (libraryAutoRefreshTimer) {
+    window.clearInterval(libraryAutoRefreshTimer);
+    libraryAutoRefreshTimer = 0;
+  }
+}
+
+function handleLibraryVisibilityChange() {
+  if (!document.hidden) {
+    void refreshLibrarySilently();
+  }
+}
+
+function handleLibraryFocus() {
+  void refreshLibrarySilently();
+}
+
+function shouldSkipSilentLibraryRefresh() {
+  return (
+    state.isBusy ||
+    document.hidden ||
+    isUploadModalOpen() ||
+    isNotebookOpen() ||
+    isImageViewerOpen() ||
+    isImageEditorOpen() ||
+    elements.folderModal?.classList.contains("open")
+  );
+}
+
+async function refreshLibrarySilently() {
+  if (shouldSkipSilentLibraryRefresh()) {
+    return;
+  }
+
+  if (libraryRefreshPromise) {
+    return libraryRefreshPromise;
+  }
+
+  libraryRefreshPromise = refreshLibrary(state.selectedFolderId)
+    .catch((error) => {
+      console.error(error);
+    })
+    .finally(() => {
+      libraryRefreshPromise = null;
+    });
+
+  return libraryRefreshPromise;
 }
 
 function openUploadModal() {
