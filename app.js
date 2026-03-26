@@ -16,8 +16,11 @@ const LEGACY_NOTEBOOK_TODO_KEYS = [
   "image-space-notebook-todo-list",
   "image-space-todos",
 ];
-const LIBRARY_AUTO_REFRESH_MS = 15000;
+const LIBRARY_AUTO_REFRESH_MS = 5000;
+const NOTEBOOK_AUTO_REFRESH_MS = 5000;
+const NOTEBOOK_REFRESH_MUTATION_GRACE_MS = 4000;
 const LIBRARY_REFRESH_PAUSE_MS = 6000;
+const NOTEBOOK_REFRESH_PAUSE_MS = 6000;
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
@@ -104,6 +107,7 @@ const state = {
   notebookSyncTimer: 0,
   isNotebookSyncing: false,
   isNotebookSyncQueued: false,
+  notebookLastMutatedAt: 0,
   notebookView: "notes",
   notebookTodos: [],
 };
@@ -111,12 +115,16 @@ const state = {
 let libraryAutoRefreshTimer = 0;
 let libraryRefreshPromise = null;
 let libraryRefreshPausedUntil = 0;
+let notebookAutoRefreshTimer = 0;
+let notebookRefreshPromise = null;
+let notebookRefreshPausedUntil = 0;
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
   startLibraryAutoRefresh();
+  startNotebookAutoRefresh();
   restoreNotebookStateV2();
   restoreLibraryCache();
   setBusy(true);
@@ -336,14 +344,30 @@ function stopLibraryAutoRefresh() {
   }
 }
 
+function startNotebookAutoRefresh() {
+  stopNotebookAutoRefresh();
+  notebookAutoRefreshTimer = window.setInterval(() => {
+    void refreshNotebookSilently();
+  }, NOTEBOOK_AUTO_REFRESH_MS);
+}
+
+function stopNotebookAutoRefresh() {
+  if (notebookAutoRefreshTimer) {
+    window.clearInterval(notebookAutoRefreshTimer);
+    notebookAutoRefreshTimer = 0;
+  }
+}
+
 function handleLibraryVisibilityChange() {
   if (!document.hidden) {
     void refreshLibrarySilently();
+    void refreshNotebookSilently();
   }
 }
 
 function handleLibraryFocus() {
   void refreshLibrarySilently();
+  void refreshNotebookSilently();
 }
 
 function shouldSkipSilentLibraryRefresh() {
@@ -381,6 +405,39 @@ async function refreshLibrarySilently() {
     });
 
   return libraryRefreshPromise;
+}
+
+function shouldSkipSilentNotebookRefresh() {
+  return (
+    document.hidden ||
+    state.isNotebookSyncing ||
+    Date.now() < notebookRefreshPausedUntil ||
+    Date.now() - state.notebookLastMutatedAt < NOTEBOOK_REFRESH_MUTATION_GRACE_MS
+  );
+}
+
+function pauseNotebookAutoRefresh(durationMs = NOTEBOOK_REFRESH_PAUSE_MS) {
+  notebookRefreshPausedUntil = Math.max(notebookRefreshPausedUntil, Date.now() + durationMs);
+}
+
+async function refreshNotebookSilently() {
+  if (shouldSkipSilentNotebookRefresh()) {
+    return;
+  }
+
+  if (notebookRefreshPromise) {
+    return notebookRefreshPromise;
+  }
+
+  notebookRefreshPromise = syncNotebookStateFromServerV4({ silent: true })
+    .catch((error) => {
+      console.error(error);
+    })
+    .finally(() => {
+      notebookRefreshPromise = null;
+    });
+
+  return notebookRefreshPromise;
 }
 
 function openUploadModal() {
@@ -1316,6 +1373,7 @@ function renderNotebookView() {
 
 function handleTodoSubmit(event) {
   event.preventDefault();
+  pauseNotebookAutoRefresh();
 
   const text = elements.todoInput?.value.trim() || "";
   const price = normalizeTodoPrice(elements.todoPriceInput?.value);
@@ -1348,6 +1406,10 @@ function handleTodoSubmit(event) {
 }
 
 function handleTodoListClick(event) {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
   const editButton = event.target.closest("[data-edit-todo]");
   if (editButton) {
     handleTodoEditV4(editButton.getAttribute("data-edit-todo"));
@@ -1365,22 +1427,28 @@ function handleTodoListClick(event) {
     return;
   }
 
+  pauseNotebookAutoRefresh();
   if (!window.confirm(`刪除「${targetTodo.text}」？`)) {
     return;
   }
 
   state.notebookTodos = state.notebookTodos.filter((item) => item.id !== todoId);
   persistNotebookTodos();
-  queueNotebookSyncV4();
+  queueNotebookSyncV4({ immediate: true });
   renderTodoListV4();
 }
 
 function handleTodoListChange(event) {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
   const checkbox = event.target.closest("[data-toggle-todo]");
   if (!checkbox) {
     return;
   }
 
+  pauseNotebookAutoRefresh();
   const todoId = checkbox.getAttribute("data-toggle-todo");
   state.notebookTodos = state.notebookTodos.map((item) =>
     item.id === todoId
@@ -1704,6 +1772,8 @@ function isNotebookStateEmptyV4(notebook) {
 }
 
 function queueNotebookSyncV4({ immediate = false } = {}) {
+  state.notebookLastMutatedAt = Date.now();
+
   if (state.notebookSyncTimer) {
     window.clearTimeout(state.notebookSyncTimer);
     state.notebookSyncTimer = 0;
@@ -1748,6 +1818,7 @@ async function syncNotebookStateToServerV4({ immediate = false, silent = false }
     }
 
     applyNotebookStateV4(payload.notebook);
+    state.notebookLastMutatedAt = 0;
   } catch (error) {
     console.error(error);
     if (!silent) {
@@ -1798,6 +1869,7 @@ function handleTodoEditV4(todoId) {
     return;
   }
 
+  pauseNotebookAutoRefresh();
   const nextText = window.prompt("編輯項目", target.text);
   if (nextText === null) {
     return;
@@ -1825,7 +1897,7 @@ function handleTodoEditV4(todoId) {
   );
 
   persistNotebookTodos();
-  queueNotebookSyncV4();
+  queueNotebookSyncV4({ immediate: true });
   renderTodoListV4();
 }
 
