@@ -139,14 +139,11 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   bindEvents();
   restoreViewPreferences();
-  startLibraryAutoRefresh();
-  startNotebookAutoRefresh();
-  restoreNotebookStateV2();
-  restoreLibraryCache();
+  restoreNotebookViewPreference();
   setBusy(true);
 
   try {
-    await refreshLibrary();
+    await refreshLibrary(undefined, { allowCacheFallback: true });
     setStatus("準備完成，可以開始上傳圖片。");
   } catch (error) {
     console.error(error);
@@ -159,7 +156,11 @@ async function init() {
     await syncNotebookStateFromServerV4();
   } catch (error) {
     console.error(error);
+    restoreNotebookStateV2();
   }
+
+  startLibraryAutoRefresh();
+  startNotebookAutoRefresh();
 }
 
 function bindEvents() {
@@ -289,6 +290,7 @@ function bindEvents() {
   window.addEventListener("online", handleLibraryFocus);
   window.addEventListener("resize", handleEditorViewportChangeV2);
   window.addEventListener("focus", handleLibraryFocus);
+  window.addEventListener("storage", handleStorageSync);
   window.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
   window.addEventListener("gesturestart", blockEditorGestureV2);
   window.addEventListener("gesturechange", blockEditorGestureV2);
@@ -501,6 +503,25 @@ function handleLibraryVisibilityChange() {
 function handleLibraryFocus() {
   void refreshLibrarySilently();
   void refreshNotebookSilently();
+}
+
+function handleStorageSync(event) {
+  if (!event.key) {
+    return;
+  }
+
+  if (event.key === LIBRARY_CACHE_KEY) {
+    void refreshLibrarySilently();
+    return;
+  }
+
+  if (
+    event.key === NOTEBOOK_CONTENT_KEY ||
+    event.key === NOTEBOOK_TODOS_KEY ||
+    event.key === NOTEBOOK_VIEW_KEY
+  ) {
+    void refreshNotebookSilently();
+  }
 }
 
 function shouldSkipSilentLibraryRefresh() {
@@ -1446,6 +1467,13 @@ function persistNotebookTodos() {
   localStorage.setItem(NOTEBOOK_TODOS_KEY, JSON.stringify(state.notebookTodos));
 }
 
+function restoreNotebookViewPreference() {
+  const savedView = localStorage.getItem(NOTEBOOK_VIEW_KEY);
+  if (savedView === "todo") {
+    state.notebookView = "todo";
+  }
+}
+
 function restoreNotebookState() {
   if (elements.notebookTextarea) {
     elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
@@ -1654,11 +1682,7 @@ function restoreNotebookStateV2() {
     elements.notebookTextarea.value = localStorage.getItem(NOTEBOOK_CONTENT_KEY) || "";
   }
 
-  const savedView = localStorage.getItem(NOTEBOOK_VIEW_KEY);
-  if (savedView === "todo") {
-    state.notebookView = "todo";
-  }
-
+  restoreNotebookViewPreference();
   state.notebookTodos = loadStoredNotebookTodosV2();
   renderNotebookView();
 }
@@ -1841,8 +1865,12 @@ function formatTodoAmountV3(value) {
 }
 
 async function syncNotebookStateFromServerV4({ silent = false } = {}) {
-  const response = await fetch("/api/notebook", {
+  const response = await fetch(buildFreshApiUrl("/api/notebook"), {
     cache: "no-store",
+    headers: {
+      "Cache-Control": "no-store",
+      Pragma: "no-cache",
+    },
   });
   const payload = await parseJson(response);
 
@@ -1851,10 +1879,11 @@ async function syncNotebookStateFromServerV4({ silent = false } = {}) {
   }
 
   const notebook = normalizeNotebookStateV4(payload.notebook);
-  const localNotebook = buildNotebookStatePayloadV4();
+  const localNotebook = buildLocalNotebookStatePayloadV4();
 
   if (isNotebookStateEmptyV4(notebook) && !isNotebookStateEmptyV4(localNotebook)) {
-    await syncNotebookStateToServerV4({ immediate: true, silent: true });
+    applyNotebookStateV4(localNotebook);
+    await syncNotebookStateToServerV4({ immediate: true, silent: true, payload: localNotebook });
     return;
   }
 
@@ -1882,6 +1911,21 @@ function buildNotebookStatePayloadV4() {
   return {
     content: elements.notebookTextarea?.value || "",
     todos: state.notebookTodos.map((item) => ({
+      id: item.id,
+      text: item.text,
+      price: normalizeTodoPrice(item.price),
+      done: Boolean(item.done),
+    })),
+  };
+}
+
+function buildLocalNotebookStatePayloadV4() {
+  const fallbackTodos = loadStoredNotebookTodosV2();
+  const sourceTodos = state.notebookTodos.length > 0 || fallbackTodos.length === 0 ? state.notebookTodos : fallbackTodos;
+
+  return {
+    content: elements.notebookTextarea?.value ?? localStorage.getItem(NOTEBOOK_CONTENT_KEY) ?? "",
+    todos: sourceTodos.map((item) => ({
       id: item.id,
       text: item.text,
       price: normalizeTodoPrice(item.price),
@@ -1923,7 +1967,7 @@ function queueNotebookSyncV4({ immediate = false } = {}) {
   }, 260);
 }
 
-async function syncNotebookStateToServerV4({ immediate = false, silent = false } = {}) {
+async function syncNotebookStateToServerV4({ immediate = false, silent = false, payload = null } = {}) {
   if (!immediate && state.notebookSyncTimer) {
     window.clearTimeout(state.notebookSyncTimer);
     state.notebookSyncTimer = 0;
@@ -1937,12 +1981,13 @@ async function syncNotebookStateToServerV4({ immediate = false, silent = false }
   state.isNotebookSyncing = true;
 
   try {
+    const nextPayload = normalizeNotebookStateV4(payload || buildNotebookStatePayloadV4());
     const response = await fetch("/api/notebook", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(buildNotebookStatePayloadV4()),
+      body: JSON.stringify(nextPayload),
     });
     const payload = await parseJson(response);
 
@@ -2364,10 +2409,14 @@ async function handleUpload(event) {
   }
 }
 
-async function refreshLibrary(preferredFolderId = state.selectedFolderId) {
+async function refreshLibrary(preferredFolderId = state.selectedFolderId, { allowCacheFallback = false } = {}) {
   try {
-    const response = await fetch("/api/library", {
+    const response = await fetch(buildFreshApiUrl("/api/library"), {
       cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+      },
     });
 
     const payload = await parseJson(response);
@@ -2378,7 +2427,7 @@ async function refreshLibrary(preferredFolderId = state.selectedFolderId) {
     applyLibraryPayload(payload, preferredFolderId);
     saveLibraryCache();
   } catch (error) {
-    if (restoreLibraryCache(preferredFolderId)) {
+    if (allowCacheFallback && restoreLibraryCache(preferredFolderId)) {
       return;
     }
 
@@ -2697,6 +2746,12 @@ async function parseJson(response) {
     console.error(error);
     return {};
   }
+}
+
+function buildFreshApiUrl(pathname) {
+  const url = new URL(pathname, window.location.origin);
+  url.searchParams.set("_ts", String(Date.now()));
+  return url.toString();
 }
 
 function setBusy(isBusy) {
