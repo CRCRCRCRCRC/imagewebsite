@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260328a" />
   </head>
   <body>
     <button class="notebook-corner-button" id="openNotebookMode" type="button" aria-label="開啟筆記本模式">
@@ -22,6 +22,60 @@
         <path d="M10 16h4" />
       </svg>
     </button>
+
+    <button
+      class="view-controls-button"
+      id="toggleViewControls"
+      type="button"
+      aria-label="調整檢視"
+      aria-controls="viewControlsPanel"
+      aria-expanded="false"
+    >
+      <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
+        <path d="M5 7h14" />
+        <path d="M5 12h14" />
+        <path d="M5 17h14" />
+        <circle cx="9" cy="7" r="2" />
+        <circle cx="15" cy="12" r="2" />
+        <circle cx="11" cy="17" r="2" />
+      </svg>
+    </button>
+
+    <section class="view-controls-panel" id="viewControlsPanel" aria-hidden="true">
+      <div class="view-controls-group">
+        <div class="view-controls-head">
+          <span>圖片高度</span>
+          <strong id="galleryHeightValue">320px</strong>
+        </div>
+        <input
+          id="galleryHeightInput"
+          class="view-controls-range"
+          type="range"
+          min="180"
+          max="520"
+          step="10"
+          value="320"
+        />
+      </div>
+
+      <div class="view-controls-group">
+        <div class="view-controls-head">
+          <span>網站縮放</span>
+          <strong id="siteScaleValue">100%</strong>
+        </div>
+        <input
+          id="siteScaleInput"
+          class="view-controls-range"
+          type="range"
+          min="70"
+          max="140"
+          step="5"
+          value="100"
+        />
+      </div>
+
+      <button class="view-controls-reset" id="resetViewControls" type="button">重設</button>
+    </section>
 
     <main class="desktop-shell">
       <section class="workspace-stack">
@@ -315,6 +369,6 @@
       </section>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=20260328a"></script>
   </body>
 </html>

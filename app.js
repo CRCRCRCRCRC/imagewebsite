@@ -16,6 +16,14 @@ const LEGACY_NOTEBOOK_TODO_KEYS = [
   "image-space-notebook-todo-list",
   "image-space-todos",
 ];
+const GALLERY_HEIGHT_KEY = "image-space-gallery-height";
+const SITE_SCALE_KEY = "image-space-site-scale";
+const DEFAULT_GALLERY_HEIGHT = 320;
+const MIN_GALLERY_HEIGHT = 180;
+const MAX_GALLERY_HEIGHT = 520;
+const DEFAULT_SITE_SCALE = 100;
+const MIN_SITE_SCALE = 70;
+const MAX_SITE_SCALE = 140;
 const LIBRARY_AUTO_REFRESH_MS = 5000;
 const NOTEBOOK_AUTO_REFRESH_MS = 5000;
 const NOTEBOOK_REFRESH_MUTATION_GRACE_MS = 4000;
@@ -24,6 +32,13 @@ const NOTEBOOK_REFRESH_PAUSE_MS = 6000;
 
 const elements = {
   openNotebookMode: document.querySelector("#openNotebookMode"),
+  toggleViewControls: document.querySelector("#toggleViewControls"),
+  viewControlsPanel: document.querySelector("#viewControlsPanel"),
+  galleryHeightInput: document.querySelector("#galleryHeightInput"),
+  galleryHeightValue: document.querySelector("#galleryHeightValue"),
+  siteScaleInput: document.querySelector("#siteScaleInput"),
+  siteScaleValue: document.querySelector("#siteScaleValue"),
+  resetViewControls: document.querySelector("#resetViewControls"),
   closeNotebookMode: document.querySelector("#closeNotebookMode"),
   notebookMode: document.querySelector("#notebookMode"),
   notebookTextarea: document.querySelector("#notebookTextarea"),
@@ -123,6 +138,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   bindEvents();
+  restoreViewPreferences();
   startLibraryAutoRefresh();
   startNotebookAutoRefresh();
   restoreNotebookStateV2();
@@ -148,6 +164,10 @@ async function init() {
 
 function bindEvents() {
   elements.openNotebookMode?.addEventListener("click", openNotebookMode);
+  elements.toggleViewControls?.addEventListener("click", toggleViewControls);
+  elements.galleryHeightInput?.addEventListener("input", handleGalleryHeightInput);
+  elements.siteScaleInput?.addEventListener("input", handleSiteScaleInput);
+  elements.resetViewControls?.addEventListener("click", resetViewPreferences);
   elements.closeNotebookMode?.addEventListener("click", closeNotebookMode);
   elements.notebookTextarea?.addEventListener("input", handleNotebookInput);
   elements.notebookTextarea?.addEventListener("blur", handleNotebookBlurV4);
@@ -263,7 +283,10 @@ function bindEvents() {
   });
 
   document.addEventListener("paste", handleUploadPaste);
+  document.addEventListener("click", handleViewControlsOutsideClick);
   document.addEventListener("visibilitychange", handleLibraryVisibilityChange);
+  window.addEventListener("pageshow", handleLibraryFocus);
+  window.addEventListener("online", handleLibraryFocus);
   window.addEventListener("resize", handleEditorViewportChangeV2);
   window.addEventListener("focus", handleLibraryFocus);
   window.addEventListener("wheel", handleEditorWheelZoomV2, { passive: false });
@@ -273,6 +296,11 @@ function bindEvents() {
   window.addEventListener("pagehide", flushNotebookSyncV4);
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && elements.viewControlsPanel?.classList.contains("open")) {
+      closeViewControls();
+      return;
+    }
+
     if (event.key === "Escape" && isNotebookOpen()) {
       closeNotebookMode();
       return;
@@ -297,6 +325,111 @@ function bindEvents() {
       closeFolderModal();
     }
   });
+}
+
+function restoreViewPreferences() {
+  applyGalleryHeightPreference(getStoredNumber(GALLERY_HEIGHT_KEY, DEFAULT_GALLERY_HEIGHT), { persist: false });
+  applySiteScalePreference(getStoredNumber(SITE_SCALE_KEY, DEFAULT_SITE_SCALE), { persist: false });
+}
+
+function toggleViewControls() {
+  if (!elements.viewControlsPanel || !elements.toggleViewControls) {
+    return;
+  }
+
+  const shouldOpen = !elements.viewControlsPanel.classList.contains("open");
+  elements.viewControlsPanel.classList.toggle("open", shouldOpen);
+  elements.viewControlsPanel.setAttribute("aria-hidden", String(!shouldOpen));
+  elements.toggleViewControls.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+function closeViewControls() {
+  elements.viewControlsPanel?.classList.remove("open");
+  elements.viewControlsPanel?.setAttribute("aria-hidden", "true");
+  elements.toggleViewControls?.setAttribute("aria-expanded", "false");
+}
+
+function handleViewControlsOutsideClick(event) {
+  if (!(event.target instanceof Node)) {
+    return;
+  }
+
+  if (!elements.viewControlsPanel?.classList.contains("open")) {
+    return;
+  }
+
+  const clickedToggle = Boolean(elements.toggleViewControls?.contains(event.target));
+  const clickedPanel = Boolean(elements.viewControlsPanel.contains(event.target));
+  if (!clickedToggle && !clickedPanel) {
+    closeViewControls();
+  }
+}
+
+function handleGalleryHeightInput(event) {
+  const nextValue = Number(event.target?.value);
+  applyGalleryHeightPreference(nextValue);
+}
+
+function handleSiteScaleInput(event) {
+  const nextValue = Number(event.target?.value);
+  applySiteScalePreference(nextValue);
+}
+
+function resetViewPreferences() {
+  applyGalleryHeightPreference(DEFAULT_GALLERY_HEIGHT);
+  applySiteScalePreference(DEFAULT_SITE_SCALE);
+}
+
+function applyGalleryHeightPreference(value, { persist = true } = {}) {
+  const nextHeight = clampNumber(value, MIN_GALLERY_HEIGHT, MAX_GALLERY_HEIGHT, DEFAULT_GALLERY_HEIGHT);
+  document.documentElement.style.setProperty("--gallery-image-height", `${nextHeight}px`);
+
+  if (elements.galleryHeightInput) {
+    elements.galleryHeightInput.value = String(nextHeight);
+  }
+
+  updateText(elements.galleryHeightValue, `${nextHeight}px`);
+
+  if (persist) {
+    localStorage.setItem(GALLERY_HEIGHT_KEY, String(nextHeight));
+  }
+}
+
+function applySiteScalePreference(value, { persist = true } = {}) {
+  const nextScalePercent = clampNumber(value, MIN_SITE_SCALE, MAX_SITE_SCALE, DEFAULT_SITE_SCALE);
+  const nextScale = nextScalePercent / 100;
+  const inverseScale = 1 / nextScale;
+
+  document.documentElement.style.setProperty("--site-scale", nextScale.toFixed(2));
+  document.documentElement.style.setProperty("--site-scale-inverse", inverseScale.toFixed(4));
+
+  if (elements.siteScaleInput) {
+    elements.siteScaleInput.value = String(nextScalePercent);
+  }
+
+  updateText(elements.siteScaleValue, `${nextScalePercent}%`);
+
+  if (persist) {
+    localStorage.setItem(SITE_SCALE_KEY, String(nextScalePercent));
+  }
+}
+
+function getStoredNumber(key, fallbackValue) {
+  const rawValue = localStorage.getItem(key);
+  if (!rawValue) {
+    return fallbackValue;
+  }
+
+  const nextValue = Number(rawValue);
+  return Number.isFinite(nextValue) ? nextValue : fallbackValue;
+}
+
+function clampNumber(value, min, max, fallbackValue) {
+  if (!Number.isFinite(value)) {
+    return fallbackValue;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function openNotebookMode() {
