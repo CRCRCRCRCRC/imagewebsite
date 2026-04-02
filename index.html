@@ -13,16 +13,6 @@
     <link rel="stylesheet" href="./styles.css?v=20260328a" />
   </head>
   <body>
-    <button class="notebook-corner-button" id="openNotebookMode" type="button" aria-label="開啟筆記本模式">
-      <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
-        <path d="M8 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8" />
-        <path d="M8 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2" />
-        <path d="M10 8h6" />
-        <path d="M10 12h6" />
-        <path d="M10 16h4" />
-      </svg>
-    </button>
-
     <button
       class="view-controls-button"
       id="toggleViewControls"
@@ -297,75 +287,6 @@
             <button type="button" class="solid-button upload-text-button" id="saveEditor">儲存</button>
           </div>
         </aside>
-      </section>
-    </div>
-
-    <div class="notebook-mode" id="notebookMode" aria-hidden="true">
-      <section class="notebook-shell" role="dialog" aria-modal="true" aria-label="Notebook">
-        <div class="notebook-toolbar">
-          <div class="notebook-toolbar-actions">
-            <div class="notebook-mode-switch" role="tablist" aria-label="筆記模式切換">
-              <button type="button" class="notebook-switch-button active" id="showNotebookNotes" role="tab" aria-selected="true">
-                筆記
-              </button>
-              <button type="button" class="notebook-switch-button" id="showNotebookTodo" role="tab" aria-selected="false">
-                To-Do List
-              </button>
-            </div>
-
-            <button type="button" class="notebook-close-button" id="closeNotebookMode" aria-label="關閉筆記本模式">
-              <svg viewBox="0 0 24 24" class="mini-icon" aria-hidden="true">
-                <path d="M6 6l12 12" />
-                <path d="M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="notebook-stage">
-          <section class="notebook-panel notebook-panel-notes active" id="notebookNotesPanel" role="tabpanel" aria-labelledby="showNotebookNotes">
-            <textarea
-              id="notebookTextarea"
-              class="notebook-textarea"
-              spellcheck="false"
-              placeholder="在這裡打字"
-            ></textarea>
-          </section>
-
-          <section class="notebook-panel notebook-panel-todo" id="notebookTodoPanel" role="tabpanel" aria-labelledby="showNotebookTodo" hidden>
-            <div class="notebook-panel-head">
-              <div class="todo-panel-heading">
-                <strong>To-Do List</strong>
-                <div class="todo-summary" aria-label="待辦金額摘要">
-                  <span class="todo-summary-chip">
-                    <span class="todo-summary-label">總金額</span>
-                    <strong id="todoTotalAmount">0</strong>
-                  </span>
-                  <span class="todo-summary-chip">
-                    <span class="todo-summary-label">未勾選</span>
-                    <strong id="todoOpenAmount">0</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <form class="todo-composer" id="todoForm">
-              <input id="todoInput" class="todo-input" type="text" maxlength="120" autocomplete="off" placeholder="輸入項目" />
-              <input
-                id="todoPriceInput"
-                class="todo-input todo-price-input"
-                type="text"
-                inputmode="decimal"
-                maxlength="20"
-                autocomplete="off"
-                placeholder="價格"
-              />
-              <button type="submit" class="todo-add-button" id="addTodoButton">新增</button>
-            </form>
-
-            <div class="todo-list" id="todoList"></div>
-          </section>
-        </div>
       </section>
     </div>
 

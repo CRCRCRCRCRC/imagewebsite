@@ -139,7 +139,6 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   bindEvents();
   restoreViewPreferences();
-  restoreNotebookViewPreference();
   setBusy(true);
 
   try {
@@ -152,31 +151,14 @@ async function init() {
     setBusy(false);
   }
 
-  try {
-    await syncNotebookStateFromServerV4();
-  } catch (error) {
-    console.error(error);
-    restoreNotebookStateV2();
-  }
-
   startLibraryAutoRefresh();
-  startNotebookAutoRefresh();
 }
 
 function bindEvents() {
-  elements.openNotebookMode?.addEventListener("click", openNotebookMode);
   elements.toggleViewControls?.addEventListener("click", toggleViewControls);
   elements.galleryHeightInput?.addEventListener("input", handleGalleryHeightInput);
   elements.siteScaleInput?.addEventListener("input", handleSiteScaleInput);
   elements.resetViewControls?.addEventListener("click", resetViewPreferences);
-  elements.closeNotebookMode?.addEventListener("click", closeNotebookMode);
-  elements.notebookTextarea?.addEventListener("input", handleNotebookInput);
-  elements.notebookTextarea?.addEventListener("blur", handleNotebookBlurV4);
-  elements.showNotebookNotes?.addEventListener("click", () => setNotebookView("notes"));
-  elements.showNotebookTodo?.addEventListener("click", () => setNotebookView("todo"));
-  elements.todoForm?.addEventListener("submit", handleTodoSubmit);
-  elements.todoList?.addEventListener("click", handleTodoListClick);
-  elements.todoList?.addEventListener("change", handleTodoListChange);
   elements.uploadTrigger?.addEventListener("click", () => {
     if (state.isBusy) {
       return;
@@ -277,12 +259,6 @@ function bindEvents() {
     }
   });
 
-  elements.notebookMode?.addEventListener("click", (event) => {
-    if (event.target === elements.notebookMode) {
-      closeNotebookMode();
-    }
-  });
-
   document.addEventListener("paste", handleUploadPaste);
   document.addEventListener("click", handleViewControlsOutsideClick);
   document.addEventListener("visibilitychange", handleLibraryVisibilityChange);
@@ -295,16 +271,10 @@ function bindEvents() {
   window.addEventListener("gesturestart", blockEditorGestureV2);
   window.addEventListener("gesturechange", blockEditorGestureV2);
   window.addEventListener("gestureend", blockEditorGestureV2);
-  window.addEventListener("pagehide", flushNotebookSyncV4);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && elements.viewControlsPanel?.classList.contains("open")) {
       closeViewControls();
-      return;
-    }
-
-    if (event.key === "Escape" && isNotebookOpen()) {
-      closeNotebookMode();
       return;
     }
 
@@ -496,13 +466,11 @@ function stopNotebookAutoRefresh() {
 function handleLibraryVisibilityChange() {
   if (!document.hidden) {
     void refreshLibrarySilently();
-    void refreshNotebookSilently();
   }
 }
 
 function handleLibraryFocus() {
   void refreshLibrarySilently();
-  void refreshNotebookSilently();
 }
 
 function handleStorageSync(event) {
@@ -512,15 +480,6 @@ function handleStorageSync(event) {
 
   if (event.key === LIBRARY_CACHE_KEY) {
     void refreshLibrarySilently();
-    return;
-  }
-
-  if (
-    event.key === NOTEBOOK_CONTENT_KEY ||
-    event.key === NOTEBOOK_TODOS_KEY ||
-    event.key === NOTEBOOK_VIEW_KEY
-  ) {
-    void refreshNotebookSilently();
   }
 }
 
@@ -530,7 +489,6 @@ function shouldSkipSilentLibraryRefresh() {
     Date.now() < libraryRefreshPausedUntil ||
     document.hidden ||
     isUploadModalOpen() ||
-    isNotebookOpen() ||
     isImageViewerOpen() ||
     isImageEditorOpen() ||
     elements.folderModal?.classList.contains("open")

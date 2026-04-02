@@ -97,7 +97,7 @@ body::selection {
 .view-controls-button {
   position: fixed;
   top: 10px;
-  left: 54px;
+  left: 10px;
   z-index: 26;
   display: grid;
   place-items: center;
@@ -1952,7 +1952,7 @@ body::selection {
 
   .view-controls-button {
     top: 8px;
-    left: 44px;
+    left: 8px;
     width: 30px;
     height: 30px;
     border-radius: 10px;
