@@ -31,8 +31,7 @@ body.editor-viewport-locked {
 
 body {
   margin: 0;
-  width: calc(100% * var(--site-scale-inverse));
-  min-height: calc(100vh * var(--site-scale-inverse));
+  min-height: 100vh;
   color: var(--ink);
   font-family: "Space Grotesk", "Noto Sans TC", sans-serif;
   overflow-x: hidden;
@@ -40,8 +39,7 @@ body {
     radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.86), transparent 18%),
     radial-gradient(circle at 82% 22%, rgba(255, 255, 255, 0.26), transparent 22%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 44%, var(--sky-bottom) 100%);
-  transform: scale(var(--site-scale));
-  transform-origin: top left;
+  zoom: var(--site-scale);
 }
 
 body.notebook-open {
