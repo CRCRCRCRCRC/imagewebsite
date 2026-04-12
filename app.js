@@ -2382,8 +2382,10 @@ async function refreshLibrary(preferredFolderId = state.selectedFolderId, { allo
       throw new Error(payload.error || "讀取資料失敗。");
     }
 
-    applyLibraryPayload(payload, preferredFolderId);
-    saveLibraryCache();
+    const didChange = applyLibraryPayload(payload, preferredFolderId);
+    if (didChange) {
+      saveLibraryCache();
+    }
   } catch (error) {
     if (allowCacheFallback && restoreLibraryCache(preferredFolderId)) {
       return;
@@ -2637,20 +2639,55 @@ function saveSelectedFolder() {
 }
 
 function applyLibraryPayload(payload, preferredFolderId = state.selectedFolderId) {
-  state.folders = Array.isArray(payload.folders) ? payload.folders : [];
-  state.images = Array.isArray(payload.images) ? payload.images : [];
+  const nextFolders = Array.isArray(payload.folders) ? payload.folders : [];
+  const nextImages = Array.isArray(payload.images) ? payload.images : [];
 
   const savedFolderId = localStorage.getItem(SELECTED_FOLDER_KEY);
   const nextFolderId = preferredFolderId ?? savedFolderId;
+  const nextSelectedFolderId =
+    nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId && folder.id !== ROOT_FOLDER_ID)
+      ? nextFolderId
+      : null;
 
-  if (nextFolderId && state.folders.some((folder) => folder.id === nextFolderId && folder.id !== ROOT_FOLDER_ID)) {
-    state.selectedFolderId = nextFolderId;
-  } else {
-    state.selectedFolderId = null;
+  const currentSignature = getLibraryPayloadSignature(state.folders, state.images, state.selectedFolderId);
+  const nextSignature = getLibraryPayloadSignature(nextFolders, nextImages, nextSelectedFolderId);
+  if (currentSignature === nextSignature) {
+    return false;
   }
+
+  state.folders = nextFolders;
+  state.images = nextImages;
+  state.selectedFolderId = nextSelectedFolderId;
 
   saveSelectedFolder();
   render();
+  return true;
+}
+
+function getLibraryPayloadSignature(folders, images, selectedFolderId) {
+  return JSON.stringify({
+    selectedFolderId: selectedFolderId || null,
+    folders: folders
+      .map((folder) => ({
+        id: folder.id || "",
+        name: folder.name || "",
+        imageCount: Number(folder.imageCount) || 0,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+    images: images
+      .map((image) => ({
+        id: image.id || "",
+        folderId: image.folderId || "",
+        name: image.name || "",
+        originalName: image.originalName || "",
+        size: Number(image.size) || 0,
+        uploadedAt: image.uploadedAt || "",
+        url: image.url || "",
+        thumbnailUrl: image.thumbnailUrl || "",
+        updatedAt: Number(image.updatedAt) || 0,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  });
 }
 
 function saveLibraryCache() {
