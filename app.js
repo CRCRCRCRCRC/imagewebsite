@@ -85,9 +85,7 @@ const elements = {
   editorBrushSize: document.querySelector("#editorBrushSize"),
   closeEditor: document.querySelector("#closeEditor"),
   saveEditor: document.querySelector("#saveEditor"),
-  renamePreview: document.querySelector("#renamePreview"),
   previewImage: document.querySelector("#previewImage"),
-  previewName: document.querySelector("#previewName"),
   closePreview: document.querySelector("#closePreview"),
   downloadPreview: document.querySelector("#downloadPreview"),
   copyPreview: document.querySelector("#copyPreview"),
@@ -198,7 +196,6 @@ function bindEvents() {
   });
   elements.closeFolderModal?.addEventListener("click", closeFolderModal);
   elements.folderForm?.addEventListener("submit", handleCreateFolder);
-  elements.renamePreview?.addEventListener("click", handleRenamePreviewFast);
   elements.editPreview?.addEventListener("click", openImageEditorV2);
   elements.closePreview?.addEventListener("click", closeImageViewer);
   elements.downloadPreview?.addEventListener("click", handleDownloadPreview);
@@ -614,10 +611,8 @@ function openImageViewer(image) {
 
   if (elements.previewImage) {
     elements.previewImage.src = image.url;
-    elements.previewImage.alt = image.name || "";
+    elements.previewImage.alt = "";
   }
-
-  updateText(elements.previewName, image.name || "");
 
   elements.imageViewer?.classList.add("open");
   elements.imageViewer?.setAttribute("aria-hidden", "false");
@@ -635,7 +630,6 @@ function closeImageViewer() {
     elements.previewImage.alt = "";
   }
 
-  updateText(elements.previewName, "");
 }
 
 function isImageEditorOpen() {
@@ -2577,8 +2571,7 @@ function renderGallery() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "gallery-item";
-    button.setAttribute("aria-label", image.name || "開啟圖片");
-    button.title = image.name || "";
+    button.setAttribute("aria-label", "圖片");
 
     const media = document.createElement("span");
     media.className = "gallery-media";
@@ -2589,13 +2582,9 @@ function renderGallery() {
     img.loading = "lazy";
     img.decoding = "async";
 
-    const label = document.createElement("span");
-    label.className = "gallery-name";
-    label.textContent = image.name || "";
-
     button.addEventListener("click", () => openImageViewer(image));
     media.append(img);
-    button.append(media, label);
+    button.append(media);
     elements.galleryGrid?.append(button);
   });
 
@@ -2858,124 +2847,21 @@ async function handleCopyPreview() {
   }
 }
 
-async function handleRenamePreviewFast() {
-  if (!state.activePreview) {
-    return;
-  }
-
-  pauseLibraryAutoRefresh();
-  const imageId = state.activePreview.id;
-  const previousName = state.activePreview.name || "";
-  const nextName = window.prompt("重新命名圖片", previousName);
-  if (nextName === null) {
-    return;
-  }
-
-  const normalizedName = normalizeImageName(nextName);
-  if (!normalizedName) {
-    setStatus("圖片名稱不能是空的。", true);
-    return;
-  }
-
-  if (normalizedName === previousName) {
-    return;
-  }
-
-  try {
-    pauseLibraryAutoRefresh();
-    setViewerBusy(true);
-    applyRenamedImage(imageId, normalizedName);
-
-    const response = await fetch("/api/images", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        imageId,
-        name: normalizedName,
-      }),
-    });
-
-    const payload = await parseJson(response);
-    if (!response.ok) {
-      throw new Error(payload.error || "重新命名失敗。");
-    }
-
-    const confirmedName = payload.image?.name || normalizedName;
-    if (confirmedName !== normalizedName) {
-      applyRenamedImage(imageId, confirmedName);
-    }
-
-    setStatus(`圖片已重新命名為 ${confirmedName}。`);
-  } catch (error) {
-    applyRenamedImage(imageId, previousName);
-    console.error(error);
-    setStatus(error.message || "重新命名失敗。", true);
-  } finally {
-    setViewerBusy(false);
-  }
-}
-
-async function handleRenamePreview() {
-  if (!state.activePreview) {
-    return;
-  }
-
-  pauseLibraryAutoRefresh();
-  const nextName = window.prompt("輸入圖片名稱", state.activePreview.name || "");
-  if (nextName === null) {
-    return;
-  }
-
-  const normalizedName = normalizeImageName(nextName);
-  if (!normalizedName) {
-    setStatus("圖片名稱不能是空的。", true);
-    return;
-  }
-
-  try {
-    pauseLibraryAutoRefresh();
-    setViewerBusy(true);
-
-    const response = await fetch("/api/images", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        imageId: state.activePreview.id,
-        name: normalizedName,
-      }),
-    });
-
-    const payload = await parseJson(response);
-    if (!response.ok) {
-      throw new Error(payload.error || "重新命名失敗。");
-    }
-
-    applyRenamedImage(payload.image.id, payload.image.name);
-    setStatus(`圖片已重新命名為 ${payload.image.name}。`);
-  } catch (error) {
-    console.error(error);
-    setStatus(error.message || "重新命名失敗。", true);
-  } finally {
-    setViewerBusy(false);
-  }
-}
-
 async function handleDeletePreview() {
   if (!state.activePreview) {
     return;
   }
 
   const image = state.activePreview;
-  const imageLabel = image.name || "這張圖片";
+  const imageLabel = "這張圖片";
   pauseLibraryAutoRefresh();
   const confirmed = window.confirm(`確定要刪除「${imageLabel}」嗎？這個動作不能復原。`);
   if (!confirmed) {
     return;
   }
+
+  removeImageFromState(image.id);
+  closeImageViewer();
 
   try {
     pauseLibraryAutoRefresh();
@@ -2996,10 +2882,9 @@ async function handleDeletePreview() {
       throw new Error(payload.error || "刪除圖片失敗。");
     }
 
-    removeImageFromState(image.id);
-    closeImageViewer();
     setStatus(`已刪除 ${imageLabel}`);
   } catch (error) {
+    restoreRemovedImage(image);
     console.error(error);
     setStatus(error.message || "刪除圖片失敗。", true);
   } finally {
@@ -3028,10 +2913,6 @@ function setViewerBusy(isBusy) {
     elements.editPreview.disabled = isBusy;
   }
 
-  if (elements.renamePreview) {
-    elements.renamePreview.disabled = isBusy;
-  }
-
   if (elements.downloadPreview) {
     elements.downloadPreview.disabled = isBusy;
   }
@@ -3045,28 +2926,22 @@ function setViewerBusy(isBusy) {
   }
 }
 
-function applyRenamedImage(imageId, name) {
-  state.images = state.images.map((image) => (image.id === imageId ? { ...image, name } : image));
-
-  if (state.activePreview?.id === imageId) {
-    state.activePreview = {
-      ...state.activePreview,
-      name,
-    };
-
-    if (elements.previewImage) {
-      elements.previewImage.alt = name;
-    }
-
-    updateText(elements.previewName, name);
-  }
-
+function removeImageFromState(imageId) {
+  state.images = state.images.filter((image) => image.id !== imageId);
+  syncFolderImageCounts();
   saveLibraryCache();
   render();
 }
 
-function removeImageFromState(imageId) {
-  state.images = state.images.filter((image) => image.id !== imageId);
+function restoreRemovedImage(image) {
+  if (!image || !image.id) {
+    return;
+  }
+
+  const restored = [image, ...state.images.filter((item) => item.id !== image.id)].sort(
+    (left, right) => new Date(right.uploadedAt).getTime() - new Date(left.uploadedAt).getTime(),
+  );
+  state.images = restored;
   syncFolderImageCounts();
   saveLibraryCache();
   render();

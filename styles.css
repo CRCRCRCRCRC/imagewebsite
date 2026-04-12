@@ -4,6 +4,8 @@
   --sky-bottom: #6da2ec;
   --site-scale: 1;
   --site-scale-inverse: 1;
+  --scaled-viewport-width: calc(100vw * var(--site-scale-inverse));
+  --scaled-viewport-height: calc(100vh * var(--site-scale-inverse));
   --gallery-image-height: 320px;
   --ink: #0f1a2b;
   --ink-soft: rgba(15, 26, 43, 0.72);
@@ -33,8 +35,9 @@ body.editor-viewport-locked {
 
 body {
   margin: 0;
-  min-height: 100vh;
-  height: 100%;
+  width: var(--scaled-viewport-width);
+  min-height: var(--scaled-viewport-height);
+  height: var(--scaled-viewport-height);
   color: var(--ink);
   font-family: "Space Grotesk", "Noto Sans TC", sans-serif;
   overflow: hidden;
@@ -42,7 +45,6 @@ body {
     radial-gradient(circle at 16% 12%, rgba(255, 255, 255, 0.86), transparent 18%),
     radial-gradient(circle at 82% 22%, rgba(255, 255, 255, 0.26), transparent 22%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 44%, var(--sky-bottom) 100%);
-  zoom: var(--site-scale);
 }
 
 body.notebook-open {
@@ -117,11 +119,13 @@ body::selection {
     transform var(--ease-smooth),
     background var(--ease-smooth),
     box-shadow var(--ease-smooth);
+  transform: scale(var(--site-scale));
+  transform-origin: top left;
 }
 
 .view-controls-button:hover,
 .view-controls-button:focus-visible {
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(var(--site-scale));
   background: rgba(255, 255, 255, 0.54);
   box-shadow:
     0 14px 28px rgba(18, 48, 94, 0.16),
@@ -153,7 +157,8 @@ body::selection {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(-6px);
+  transform: translateY(-6px) scale(var(--site-scale));
+  transform-origin: top left;
   transition:
     opacity var(--ease-smooth),
     visibility var(--ease-smooth),
@@ -164,7 +169,7 @@ body::selection {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translateY(0) scale(var(--site-scale));
 }
 
 .view-controls-group {
@@ -227,10 +232,14 @@ body::selection {
 
 .desktop-shell {
   position: fixed;
-  inset: 0;
-  height: 100vh;
+  top: 0;
+  left: 0;
+  width: var(--scaled-viewport-width);
+  height: var(--scaled-viewport-height);
   padding: 28px 34px 168px;
   overflow: hidden;
+  transform: scale(var(--site-scale));
+  transform-origin: top left;
 }
 
 .workspace-stack {
@@ -269,7 +278,7 @@ body::selection {
 .gallery-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 4px;
   align-items: flex-start;
   width: 100%;
 }
@@ -281,7 +290,7 @@ body::selection {
   flex: 0 0 auto;
   justify-items: center;
   align-items: start;
-  gap: 8px;
+  gap: 0;
   width: fit-content;
   height: auto;
   padding: 0;
@@ -301,12 +310,12 @@ body::selection {
   justify-content: center;
   width: fit-content;
   max-width: min(720px, calc(100vw - 120px));
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
   transition:
     border-color var(--ease-smooth),
     box-shadow var(--ease-smooth);
@@ -323,29 +332,13 @@ body::selection {
   pointer-events: none;
 }
 
-.gallery-name {
-  display: block;
-  width: fit-content;
-  max-width: min(720px, calc(100vw - 120px));
-  padding-top: 8px;
-  overflow: hidden;
-  color: var(--ink);
-  font-family: "Noto Sans TC", sans-serif;
-  font-size: 0.88rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .gallery-item:hover {
   transform: translateY(-4px);
 }
 
 .gallery-item:hover .gallery-media {
-  border-color: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 30px 56px rgba(18, 48, 94, 0.18);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .empty-state {
@@ -973,7 +966,10 @@ body::selection {
 
 .modal-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: var(--scaled-viewport-width);
+  height: var(--scaled-viewport-height);
   z-index: 30;
   display: grid;
   place-items: center;
@@ -1251,7 +1247,10 @@ body::selection {
 
 .image-viewer {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: var(--scaled-viewport-width);
+  height: var(--scaled-viewport-height);
   z-index: 40;
   display: grid;
   place-items: center;
@@ -1272,7 +1271,10 @@ body::selection {
 
 .image-editor {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: var(--scaled-viewport-width);
+  height: var(--scaled-viewport-height);
   z-index: 50;
   display: grid;
   place-items: center;
@@ -1599,13 +1601,13 @@ body::selection {
 }
 
 .gallery-media {
-  background: rgba(255, 255, 255, 0.12);
+  background: transparent;
   backdrop-filter: none;
-  box-shadow: 0 10px 24px rgba(18, 48, 94, 0.12);
+  box-shadow: none;
 }
 
 .gallery-item:hover .gallery-media {
-  box-shadow: 0 18px 34px rgba(18, 48, 94, 0.14);
+  box-shadow: none;
 }
 
 .folder-strip {
@@ -1821,8 +1823,10 @@ body::selection {
 
   .desktop-shell {
     position: fixed;
-    inset: 0;
-    height: 100vh;
+    top: 0;
+    left: 0;
+    width: var(--scaled-viewport-width);
+    height: var(--scaled-viewport-height);
     padding: 20px 16px 154px;
   }
 
@@ -1869,10 +1873,11 @@ body::selection {
   }
 
   .gallery-item {
-    gap: 8px;
+    gap: 0;
   }
 
   .gallery-media {
+    padding: 0;
     max-width: min(560px, calc(100vw - 72px));
   }
 
@@ -1933,12 +1938,12 @@ body::selection {
   }
 
   .gallery-item {
-    gap: 6px;
+    gap: 0;
     max-width: 100%;
   }
 
   .gallery-media {
-    padding: 7px;
+    padding: 0;
     max-width: calc(100vw - 48px);
   }
 
